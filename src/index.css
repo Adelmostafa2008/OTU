@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand Colors */
+  --color-brand-primary: #2dd4bf;
+  --color-brand-primary-hover: #5eead4;
+  --color-brand-primary-dark: #14b8a6;
+  --color-brand-secondary: #000000;
+
+  /* Text Colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #374151;
+  --color-text-tertiary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-text-light: #d1d5db;
+
+  /* Background Colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+
+  /* Border Colors */
+  --color-border-primary: #e5e7eb;
+  --color-border-secondary: #d1d5db;
+  --color-border-hover: #fca5a5;
+
+  /* Status Colors */
+  --color-success-bg: #f0fdf4;
+  --color-success-border: #bbf7d0;
+  --color-success-text: #166534;
+  --color-success-icon: #22c55e;
+
+  --color-error-bg: #fef2f2;
+  --color-error-border: #fecaca;
+  --color-error-text: #b91c1c;
+  --color-error-hover-bg: #fee2e2;
+  --color-error-icon: #ef4444;
+
+  --color-warning-bg: #fefce8;
+  --color-warning-border: #fef08a;
+  --color-warning-text: #854d0e;
+  --color-warning-icon: #eab308;
+
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+  --color-info-text: #1e40af;
+  --color-info-icon: #3b82f6;
+
+  /* Shadow Colors */
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02);
+  --shadow-modal: 0 10px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
+  --shadow-snackbar: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Main color class for easy theme modification */
+.theme-colors {
+  /* Brand */
+  --brand-primary: var(--color-brand-primary);
+  --brand-primary-hover: var(--color-brand-primary-hover);
+  --brand-primary-dark: var(--color-brand-primary-dark);
+  --brand-secondary: var(--color-brand-secondary);
+
+  /* Text */
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-tertiary);
+  --text-muted: var(--color-text-muted);
+
+  /* Background */
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+
+  /* Borders */
+  --border-primary: var(--color-border-primary);
+  --border-secondary: var(--color-border-secondary);
+
+  /* Status */
+  --success: var(--color-success-text);
+  --error: var(--color-error-text);
+  --warning: var(--color-warning-text);
+  --info: var(--color-info-text);
+}
