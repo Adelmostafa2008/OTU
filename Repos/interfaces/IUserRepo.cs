@@ -1,0 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using backend.Models;
+
+namespace backend.Repos.interfaces
+{
+    public interface IUserRepo : IGenericRepo<User>
+    {
+        Task<User> GetUserByRefreshToken(string RefreshToken);
+    }
+}
