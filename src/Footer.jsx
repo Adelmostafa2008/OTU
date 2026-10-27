@@ -7,7 +7,7 @@ const Footer = () => {
         <span className="text-xs text-gray-500 tracking-[0.02em]">
           © {year}{" "}
           <span className="text-gray-700 font-semibold">
-            <span className="text-teal-400">OTU</span>
+            <span style={{ color: 'var(--color-brand-primary)' }}>OTU</span>
             <span className="text-black">.hub</span>
           </span>
         </span>
@@ -17,3 +17,4 @@ const Footer = () => {
 };
 
 export default Footer;
+ 

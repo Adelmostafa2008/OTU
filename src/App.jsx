@@ -3,15 +3,24 @@ import Header from "./Header";
 import Footer from "./Footer";
 import HomePage from "./HomePage";
 import ProfilePage from "./Profile";
-import SettingsPage from "./Settings";
 import LoginPage from "./LoginPage";
 import AdminDashboard from "./AdminDashboard";
 import Subjects from "./Subjects";
 import UploadLesson from "./UploadLesson";
+import AllQuizzesPage from "./AllQuizzesPage";
+import AllMeetingsPage from "./AllMeetingsPage";
+import QuizDetailsPage from "./QuizDetailsPage";
+import MeetingDetailsPage from "./MeetingDetailsPage";
+import QuizEditPage from "./QuizEditPage";
+import MeetingEditPage from "./MeetingEditPage";
 import { useAuth } from "./AuthContext";
 
 const ProtectedRoute = ({ children, allowedRoles, deniedRoles }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -57,14 +66,6 @@ const AppContent = () => {
               }
             />
             <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/subjects"
               element={
                 <ProtectedRoute>
@@ -85,6 +86,54 @@ const AppContent = () => {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/quizzes"
+              element={
+                <ProtectedRoute>
+                  <AllQuizzesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/meetings"
+              element={
+                <ProtectedRoute>
+                  <AllMeetingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/quiz/:id"
+              element={
+                <ProtectedRoute>
+                  <QuizDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/meeting/:id"
+              element={
+                <ProtectedRoute>
+                  <MeetingDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/quiz/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <QuizEditPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/meeting/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <MeetingEditPage />
                 </ProtectedRoute>
               }
             />

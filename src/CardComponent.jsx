@@ -19,7 +19,7 @@ const CardComponent = ({
           {name}
         </h3>
 
-        <span className="text-xs font-semibold text-teal-400 tracking-[0.06em] uppercase">
+        <span className="text-xs font-semibold tracking-[0.06em] uppercase" style={{ color: 'var(--color-brand-primary)' }}>
           {subject}
         </span>
 

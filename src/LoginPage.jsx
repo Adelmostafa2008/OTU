@@ -2,31 +2,38 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
-import { useSnackbar } from "./SnackbarContext";
+import { useSnack } from "./SnackBarContext.jsx";
 
 const LoginPage = () => {
   const { login } = useAuth();
-  const { show, swallowNext } = useSnackbar();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState("");
+  const { ShowSnackBar } = useSnack();
+  const [cool, setCool] = useState(false);
+
+  const handelSnack = (msg, ty) => {
+    if(!cool){
+      setCool(true);
+      ShowSnackBar(msg, ty);
+      setTimeout(() => {
+        setCool(false);
+      }, 5000);
+    } 
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLocalError("");
 
     if (!email.trim() || !password.trim()) {
-      show("Please fill in all fields.", "warning");
-      swallowNext();
       setLocalError("Please fill in all fields.");
       return;
     }
 
     if (!email.includes("@")) {
-      show("Please enter a valid email address.", "warning");
-      swallowNext();
       setLocalError("Please enter a valid email address.");
       return;
     }
@@ -44,8 +51,7 @@ const LoginPage = () => {
 
       login(userData);
       const successMsg = response.data?.message ?? "Signed in successfully.";
-      show(successMsg, response.data?.success === false ? "info" : "success");
-      swallowNext();
+      handelSnack(successMsg, response.data?.success === false ? "info" : "success");
 
       console.log("OTU.hub login response:", response.data);
 
@@ -65,34 +71,31 @@ const LoginPage = () => {
       const status = err?.response?.status;
       if (status === 401) {
         const msg = serverMsg ?? "Invalid email or password.";
-        show(msg, "error");
-        swallowNext();
-        setLocalError(msg);
+        handelSnack(msg, "error");
+        
         return;
       }
       if (status === 400 && serverMsg) {
-        show(serverMsg, "warning");
-        swallowNext();
-        setLocalError(serverMsg);
+        handelSnack(serverMsg, "warn");
+        
         return;
       }
 
       const msg = serverMsg ?? "Something went wrong. Please try again later.";
-      show(msg, "error");
-      swallowNext();
-      setLocalError(msg);
+      handelSnack(msg, "error");
+      
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-5 box-border font-sans antialiased">
+    <div className="min-h-screen flex flex-col items-center justify-start bg-white px-5 pt-10 sm:pt-16 box-border font-sans antialiased">
       {/* ---------- Title ---------- */}
-      <div className="text-center mb-11 select-none">
+      <div className="text-center mb-10 sm:mb-12 select-none w-full">
         <h1 className="m-0 text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-tight">
-          <span className="text-teal-400">OTU</span>
-          <span className="text-black">.hub</span>
+          <span style={{ color: 'var(--color-brand-primary)' }}>OTU</span>
+          <span style={{ color: 'var(--color-brand-secondary)' }}>.hub</span>
         </h1>
       </div>
 
@@ -156,7 +159,7 @@ const LoginPage = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-teal-400 hover:bg-teal-300 text-white font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99]"
+            className="w-full rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] px-3.5 py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
           >
             {loading ? (
               <span className="inline-flex items-center gap-2">
@@ -174,7 +177,7 @@ const LoginPage = () => {
 
         <p className="mt-5 text-center text-sm text-gray-500">
           Don't have an account?{" "}
-          <span className="text-teal-400 font-semibold cursor-pointer">
+          <span className="font-semibold cursor-pointer" style={{ color: 'var(--color-brand-primary)' }}>
             Create one
           </span>
         </p>
