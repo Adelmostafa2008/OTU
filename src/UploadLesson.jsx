@@ -20,7 +20,7 @@ const UploadLesson = () => {
         setCool(false);
       }, 5000);
     }
-  };
+  }; 
 
   const [lessonData, setLessonData] = useState({
     title: "",
@@ -220,21 +220,21 @@ const UploadLesson = () => {
           <button
             onClick={() => setActiveTab("lessons")}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === "lessons" ? "text-white" : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"}`}
-            style={activeTab === "lessons" ? { backgroundColor: 'var(--color-brand-primary)' } : {}}
+            style={activeTab === "lessons" ? { backgroundColor: 'var(--color-brand-primary)', color: '#ffffff' } : {}}
           >
             Lessons
           </button>
           <button
             onClick={() => setActiveTab("quizzes")}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === "quizzes" ? "text-white" : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"}`}
-            style={activeTab === "quizzes" ? { backgroundColor: 'var(--color-brand-primary)' } : {}}
+            style={activeTab === "quizzes" ? { backgroundColor: 'var(--color-brand-primary)', color: '#ffffff' } : {}}
           >
             Quizzes/Exams
           </button>
           <button
             onClick={() => setActiveTab("meetings")}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === "meetings" ? "text-white" : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"}`}
-            style={activeTab === "meetings" ? { backgroundColor: 'var(--color-brand-primary)' } : {}}
+            style={activeTab === "meetings" ? { backgroundColor: 'var(--color-brand-primary)', color: '#ffffff' } : {}}
           >
             Online Meetings
           </button>
@@ -376,7 +376,7 @@ const UploadLesson = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full sm:w-auto px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
+                  className="w-full sm:w-auto text-white px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
                 >
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
@@ -515,7 +515,7 @@ const UploadLesson = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full sm:w-auto px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
+                  className="w-full sm:w-auto text-white px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
                 >
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
@@ -623,7 +623,7 @@ const UploadLesson = () => {
 
                 <div>
                   <label htmlFor="meeting-date" className="block text-sm font-semibold text-gray-700 mb-2">
-                    OnlineMeetingDate (date and time)
+                    Online Meeting Date (date and time)
                   </label>
                   <input
                     id="meeting-date"
@@ -654,7 +654,7 @@ const UploadLesson = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full sm:w-auto px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
+                  className="w-full sm:w-auto px-8 rounded-xl text-white font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
                 >
                   {loading ? (
                     <span className="inline-flex items-center gap-2">

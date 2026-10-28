@@ -94,15 +94,15 @@ const Subjects = () => {
               onClick={() => toggleSubject(subject.id)}
               className="w-full flex items-center gap-4 p-4 sm:p-5 bg-white hover:bg-gray-50 transition-colors text-left"
             >
-              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
-                <FiFolder className="text-teal-400" size={24} />
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand-primary) 10%, transparent)' }}>
+                <FiFolder style={{ color: 'var(--color-brand-primary)' }} size={24} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-lg font-bold text-gray-900 m-0">
                     {subject.name}
                   </h3>
-                  <span className="text-xs font-semibold text-teal-400 bg-teal-50 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ color: 'var(--color-brand-primary)', backgroundColor: 'color-mix(in srgb, var(--color-brand-primary) 10%, transparent)' }}>
                     {subject.code}
                   </span>
                 </div>
@@ -128,11 +128,27 @@ const Subjects = () => {
                   {subject.lessons.map((lesson) => (
                     <div
                       key={lesson.id}
-                      className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer group"
+                      className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 transition-all cursor-pointer group"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-brand-primary) 60%, transparent)';
+                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-brand-primary) 5%, transparent)';
+                        const iconDiv = e.currentTarget.querySelector('.lesson-icon-bg');
+                        const icon = e.currentTarget.querySelector('.lesson-icon');
+                        if (iconDiv) iconDiv.style.backgroundColor = 'color-mix(in srgb, var(--color-brand-primary) 15%, transparent)';
+                        if (icon) icon.style.color = 'var(--color-brand-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgb(229 231 235)';
+                        e.currentTarget.style.backgroundColor = 'white';
+                        const iconDiv = e.currentTarget.querySelector('.lesson-icon-bg');
+                        const icon = e.currentTarget.querySelector('.lesson-icon');
+                        if (iconDiv) iconDiv.style.backgroundColor = 'rgb(243 244 246)';
+                        if (icon) icon.style.color = 'rgb(107 114 128)';
+                      }}
                     >
-                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-100 group-hover:bg-teal-100 flex items-center justify-center transition-colors">
+                      <div className="lesson-icon-bg flex-shrink-0 w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center transition-colors">
                         <FiFileText
-                          className="text-gray-500 group-hover:text-teal-400 transition-colors"
+                          className="lesson-icon text-gray-500 transition-colors"
                           size={18}
                         />
                       </div>
