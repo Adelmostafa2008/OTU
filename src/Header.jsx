@@ -35,10 +35,11 @@ const Header = () => {
     // Instructor can access upload (not admin dashboard)
     // Student cannot access upload
     if (user.role === "instructor" || user.role === "admin") {
-      links.push({ label: "Upload Lesson", path: "/upload", requiresAuth: true, isInstructor: true });
+      links.push({ label: "Upload", path: "/upload", requiresAuth: true, isInstructor: true });
     }
     if (user.role === "admin") {
       links.push({ label: "Admin Dashboard", path: "/admin", requiresAuth: true, isAdmin: true });
+      links.push({ label: "Add student", path: "/add-student", requiresAuth: true, isAdmin: true });
     }
   }
 

@@ -18,8 +18,8 @@ const LessonCard = ({
         />
       </div>
 
-      <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex flex-col gap-1.5 flex-1 min-h-0 overflow-hidden">
-        <h3 className="m-0 text-base font-bold text-gray-900 leading-snug overflow-hidden text-ellipsis whitespace-nowrap w-full">
+      <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex flex-col gap-1.5 flex-1 min-h-0 min-w-0">
+        <h3 className="m-0 text-base font-bold text-gray-900 leading-snug max-w-[50%] truncate">
           {title}
         </h3>
 
@@ -30,8 +30,8 @@ const LessonCard = ({
           {subject}
         </span>
 
-        <div className="mt-1 flex-1 min-h-0 overflow-hidden">
-          <p className="m-0 text-sm text-gray-600 leading-relaxed overflow-hidden text-ellipsis whitespace-nowrap w-full">
+        <div className="mt-1 flex-1 min-h-0 min-w-0">
+          <p className="m-0 text-sm text-gray-600 leading-relaxed whitespace-normal break-words w-full">
             {displayDescription}
           </p>
         </div>

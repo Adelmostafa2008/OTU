@@ -14,8 +14,8 @@ const CardComponent = ({
         />
       </div>
 
-      <div className="px-4 py-4 sm:px-4 sm:py-4.5 flex flex-col gap-1.5">
-        <h3 className="m-0 text-base font-bold text-gray-900 leading-snug">
+      <div className="px-4 py-4 sm:px-4 sm:py-4.5 flex flex-col gap-1.5 min-h-0 min-w-0">
+        <h3 className="m-0 text-base font-bold text-gray-900 leading-snug max-w-[50%] truncate">
           {name}
         </h3>
 
@@ -24,7 +24,7 @@ const CardComponent = ({
         </span>
 
         {description && (
-          <p className="m-0 mt-2 text-sm text-gray-600 leading-relaxed whitespace-normal overflow-hidden">
+          <p className="m-0 mt-2 text-sm text-gray-600 leading-relaxed whitespace-normal break-words w-full">
             {description}
           </p>
         )}

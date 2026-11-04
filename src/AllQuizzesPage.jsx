@@ -56,7 +56,7 @@ const AllQuizzesPage = () => {
   return (
     <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
       <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight">
+        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
           Quizzes/Exams
         </h1>
         <p className="m-0 mt-2 text-sm text-gray-500">All quizzes and exams</p>
@@ -73,15 +73,15 @@ const AllQuizzesPage = () => {
             <button
               key={id}
               onClick={() => navigate(`/quiz/${id}`, { state: { quiz: item } })}
-              className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]"
+              className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)] min-w-0"
             >
-              <div className="flex-1">
-                <span className="text-sm sm:text-base font-semibold text-gray-900">{title}</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm sm:text-base font-semibold text-gray-900 max-w-[50%] truncate block">{title}</span>
                 {description ? (
-                  <p className="m-0 text-xs sm:text-sm text-gray-600 leading-relaxed mt-1">{description}</p>
+                  <p className="m-0 text-xs sm:text-sm text-gray-600 leading-relaxed mt-1 whitespace-normal break-words w-full">{description}</p>
                 ) : null}
               </div>
-              {date ? <span className="text-xs text-gray-500 whitespace-nowrap">{date}</span> : null}
+              {date ? <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{date}</span> : null}
             </button>
           );
         })}

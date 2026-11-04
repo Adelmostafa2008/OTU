@@ -76,7 +76,7 @@ const Subjects = () => {
   return (
     <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
       <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight">
+        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
           Subjects
         </h1>
         <p className="m-0 mt-2 text-sm text-gray-500">
@@ -98,15 +98,15 @@ const Subjects = () => {
                 <FiFolder style={{ color: 'var(--color-brand-primary)' }} size={24} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-bold text-gray-900 m-0">
+                <div className="flex items-center gap-2 mb-1 min-w-0">
+                  <h3 className="text-lg font-bold text-gray-900 m-0 max-w-[50%] truncate">
                     {subject.name}
                   </h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ color: 'var(--color-brand-primary)', backgroundColor: 'color-mix(in srgb, var(--color-brand-primary) 10%, transparent)' }}>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-md flex-shrink-0" style={{ color: 'var(--color-brand-primary)', backgroundColor: 'color-mix(in srgb, var(--color-brand-primary) 10%, transparent)' }}>
                     {subject.code}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500 m-0 truncate">
+                <p className="text-sm text-gray-500 m-0 whitespace-normal break-words w-full">
                   {subject.description}
                 </p>
                 <p className="text-xs text-gray-400 m-0 mt-1">
@@ -153,7 +153,7 @@ const Subjects = () => {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 m-0 truncate">
+                        <p className="text-sm font-medium text-gray-900 m-0 max-w-[50%] truncate">
                           {lesson.title}
                         </p>
                       </div>

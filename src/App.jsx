@@ -5,6 +5,7 @@ import HomePage from "./HomePage";
 import ProfilePage from "./Profile";
 import LoginPage from "./LoginPage";
 import AdminDashboard from "./AdminDashboard";
+import AddStudent from "./AddStudent";
 import Subjects from "./Subjects";
 import UploadLesson from "./UploadLesson";
 import AllQuizzesPage from "./AllQuizzesPage";
@@ -13,6 +14,7 @@ import QuizDetailsPage from "./QuizDetailsPage";
 import MeetingDetailsPage from "./MeetingDetailsPage";
 import QuizEditPage from "./QuizEditPage";
 import MeetingEditPage from "./MeetingEditPage";
+import ChangePassword from "./ChangePassword";
 import { useAuth } from "./AuthContext";
 
 const ProtectedRoute = ({ children, allowedRoles, deniedRoles }) => {
@@ -66,6 +68,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/change-password"
+              element={
+                <ProtectedRoute>
+                  <ChangePassword />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/subjects"
               element={
                 <ProtectedRoute>
@@ -86,6 +96,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/add-student"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AddStudent />
                 </ProtectedRoute>
               }
             />
