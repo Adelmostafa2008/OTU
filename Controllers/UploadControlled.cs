@@ -14,7 +14,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-   // [Authorize (Roles = "admin")]
+    [Authorize]
     public class UploadController : ControllerBase
     {
         private readonly ILessonRepo _lr;

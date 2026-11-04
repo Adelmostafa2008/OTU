@@ -50,22 +50,22 @@ namespace backend.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "c6e01958-265a-4657-9246-3d951e68e175",
-                            ConcurrencyStamp = "1a702614-8403-4113-9c2c-5b56d4150990",
+                            Id = "e4cb2f6a-a1f4-4d2b-882c-34537c7663ad",
+                            ConcurrencyStamp = "695f8cf2-e643-401c-b827-cc1bf56af648",
                             Name = "student",
                             NormalizedName = "STUDENT"
                         },
                         new
                         {
-                            Id = "abff48bc-aa8b-4670-b202-dc30851459a2",
-                            ConcurrencyStamp = "ab987aa9-daee-40a8-b675-8d3e2af3cb96",
+                            Id = "6961510d-84ad-4439-af3a-6ea9b6b06a53",
+                            ConcurrencyStamp = "fc7194d0-f964-409b-9d7b-301a1bf3043b",
                             Name = "admin",
                             NormalizedName = "ADMIN"
                         },
                         new
                         {
-                            Id = "e390a01e-22f6-41d1-b96d-a97a46b7035a",
-                            ConcurrencyStamp = "f2c21749-0d01-4ffe-8c0a-4f2f50e62b58",
+                            Id = "d8782df4-0684-474e-9268-c4ba5770dd5e",
+                            ConcurrencyStamp = "7ddac967-db6a-4a27-a4bf-8be778f830f5",
                             Name = "instructor",
                             NormalizedName = "INSTRUCTOR"
                         });
@@ -359,10 +359,9 @@ namespace backend.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<string>("RefreshToken")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<DateTime>("RefreshTokenExpiryDate")
+                    b.Property<DateTime?>("RefreshTokenExpiryDate")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("SecurityStamp")
@@ -381,6 +380,10 @@ namespace backend.Migrations
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
+
+                    b.Property<string>("givenName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.HasKey("Id");
 

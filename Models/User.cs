@@ -13,7 +13,8 @@ namespace backend.Models
         public string Division {get;set;} // el sho3ba
         public string Group {get;set;}
         public int Year {get;set;} = 1;
-        public string RefreshToken {get;set;}
-        public DateTime RefreshTokenExpiryDate {get;set;}
+        public string ?RefreshToken {get;set;}
+        public DateTime ?RefreshTokenExpiryDate {get;set;}
+        public string givenName {get;set;}
     }
 }

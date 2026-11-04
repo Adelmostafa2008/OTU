@@ -33,7 +33,7 @@ namespace backend.Controllers
         }
 
         [HttpPost ("create")]
-        [Authorize (Roles = "admin")]
+        [Authorize] // (Roles = "admin")
         public async Task<IActionResult> CreateNew([FromBody] UserDTO user)
         {
             try
@@ -51,8 +51,10 @@ namespace backend.Controllers
                     Division = user.Division,
                     Faculty = user.Faculty,
                     Group = user.Group,
-                    Email = user.email
-                    ,UserName = user.name
+                    Email = user.email,
+                    givenName = user.name,
+                    UserName = user.name.Split(" ")[0] + ".OTU-"+ user.code 
+                   
                 };
 
                 var createdUser = await _user.CreateAsync(newUser, user.password);
@@ -183,13 +185,21 @@ namespace backend.Controllers
             return new
                             {
                                 Id = user.Id,
-                                Role = roles[0],
-                                Username = user.UserName,
-                                Email = user.Email,
+                                role = roles[0],
+                                name = user.givenName,
+                                email = user.Email,
                                 Token = token,  
+                                phone = user.PhoneNumber,
+                                group = user.Group,
+                                division = user.Division,
+                                faculty = user.Faculty,
+                                code = user.UniversityCode,
+                                year = user.Year,
                                 message = "Logged in Successfully",
                             };
         }
+
+        
 
     }
 }

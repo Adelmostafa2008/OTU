@@ -7,13 +7,14 @@ namespace backend.DTOs
 {
     public class UserDTO
     {
-        public string code {get;set;}
-        public string Faculty {get;set;}
-        public string Division {get;set;} // el sho3ba
-        public string Group {get;set;}
-        public string email {get;set;}
-        public string password {get;set;}
-        public string name {get;set;}
+        public string code      {get;set;}
+        public string Faculty   {get;set;}
+        public string Division  {get;set;} // el sho3ba
+        public string Group      {get;set;}
+        public string email         {get;set;}
+        public string password      {get;set;}
+        public string name      {get;set;}
+        
     }
 
     public class LoginUserDTO
@@ -26,5 +27,12 @@ namespace backend.DTOs
     {
         public string UserID {get;set;}
         public int PageNum {get;set;}
+    }
+
+    public class ChangePasswordDTO
+    {
+        public string userid {get;set;}
+        public string oldpassword {get;set;}
+        public string newpassword {get;set;}
     }
 }

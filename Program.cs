@@ -4,6 +4,7 @@ using backend.data;
 using backend.Models;
 using backend.Repos;
 using backend.Repos.interfaces;
+using backend.Service;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -26,12 +27,15 @@ builder.Services.AddDbContext<AppDb>(options =>
         ServerVersion.AutoDetect(connStr));
 });
 
-builder.Services.AddScoped<ITokenGen , TokenGen>();
+builder.Services.AddScoped<ITokenGen , TokenGen>(); 
 builder.Services.AddScoped(typeof(IGenericRepo<>) , typeof(GenericRepo<>));
 builder.Services.AddScoped<IUserRepo , UserRepo>();
 builder.Services.AddScoped<ILessonRepo , LessonRepo>();
 builder.Services.AddScoped<IQuizzesRepo , QuizzesRepo>();
 builder.Services.AddScoped<IOnlineMeetRepo , OnlineMeetRepo>();
+builder.Services.AddScoped<QuizService>();
+builder.Services.AddScoped<OnlineMeetService>();
+builder.Services.AddScoped<StudentService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
