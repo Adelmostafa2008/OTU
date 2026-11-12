@@ -38,8 +38,10 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const isGuest = String(user?.role ?? "").toLowerCase() === "guest";
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading, isGuest }}>
       {children}
     </AuthContext.Provider>
   );

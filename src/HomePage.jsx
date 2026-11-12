@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import QuizExamCard from "./QuizExamCard";
 import OnlineMeetingCard from "./OnlineMeetingCard";
+import AssignmentCard from "./AssignmentCard";
 import LessonCard from "./LessonCard";
 import { LessonCardSkeleton } from "./Skeleton";
 import api from "./AxiosHelper";
@@ -18,9 +19,13 @@ const HomePage = () => {
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [quizzes, setQuizzes] = useState([]);
   const [meetings, setMeetings] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loadingLessons, setLoadingLessons] = useState(true);
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
   const [loadingMeetings, setLoadingMeetings] = useState(true);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+
+  const isGuest = String(user?.role ?? "").toLowerCase() === "guest";
 
   useEffect(() => {
     if (loading) return;
@@ -32,16 +37,16 @@ const HomePage = () => {
 
   useEffect(() => {
     if (loading || !user) return;
+    let cancelled = false;
     const fetchLessons = async () => {
       setLoadingLessons(true);
       try {
         const userId = user?.id || user?.userId || user?._id;
         let response;
         if (userId !== undefined && userId !== null && userId !== "") {
-          response = await api.get(`/Student/getlatest/${userId}`,);
-        } else {
-          response = await api.get("/Student/getlatest");
+          response = await api.get(`/Student/getlatest/${userId}`, { timeout: 15000 });
         }
+        if (cancelled) return;
         const lessonData = response?.data;
         if (!lessonData || (Array.isArray(lessonData) && lessonData.length === 0)) {
           setLessons([]);
@@ -52,31 +57,38 @@ const HomePage = () => {
         setLessons(data);
         setShowSeeMore(Array.isArray(data) && data.length >= 5);
         setTimeout(() => {
-          checkScroll();
+          if (!cancelled) checkScroll();
         }, 100);
       } catch (err) {
-        setLessons([]);
-        setShowSeeMore(false);
+        if (!cancelled) {
+          setLessons([]);
+          setShowSeeMore(false);
+        }
       } finally {
-        setLoadingLessons(false);
+        if (!cancelled) {
+          setLoadingLessons(false);
+        }
       }
     };
 
     fetchLessons();
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading]);
 
   useEffect(() => {
     if (loading || !user) return;
+    let cancelled = false;
     const fetchQuizzes = async () => {
       setLoadingQuizzes(true);
       try {
-        const userId = user?.id || user?.userId || user?._id; 
+        const userId = user?.id || user?.userId || user?._id;
         let res;
         if (userId !== undefined && userId !== null && userId !== "") {
-          res = await api.get(`/Quizzes/${userId}`);
-        } else {
-          res = await api.get("/Quizzes");
+          res = await api.get(`/Student/quiz/${userId}?IsCard=true`, { timeout: 15000 });
         }
+        if (cancelled) return;
         const quizData = res?.data;
         if (!quizData || (Array.isArray(quizData) && quizData.length === 0)) {
           setQuizzes([]);
@@ -85,27 +97,34 @@ const HomePage = () => {
         const data = Array.isArray(quizData) ? quizData : quizData ? [quizData] : [];
         setQuizzes(data);
       } catch (err) {
-        setQuizzes([]);
+        if (!cancelled) {
+          setQuizzes([]);
+        }
       } finally {
-        setLoadingQuizzes(false);
+        if (!cancelled) {
+          setLoadingQuizzes(false);
+        }
       }
     };
 
     fetchQuizzes();
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading]);
 
   useEffect(() => {
     if (loading || !user) return;
+    let cancelled = false;
     const fetchMeetings = async () => {
       setLoadingMeetings(true);
       try {
         const userId = user?.id || user?.userId || user?._id;
         let res;
         if (userId !== undefined && userId !== null && userId !== "") {
-          res = await api.get(`/OnlineMeeting/${userId}`);
-        } else {
-          res = await api.get("/OnlineMeeting");
+          res = await api.get(`/Student/meeting/${userId}?IsCard=true`, { timeout: 15000 });
         }
+        if (cancelled) return;
         const meetingData = res?.data;
         if (!meetingData || (Array.isArray(meetingData) && meetingData.length === 0)) {
           setMeetings([]);
@@ -114,13 +133,56 @@ const HomePage = () => {
         const data = Array.isArray(meetingData) ? meetingData : meetingData ? [meetingData] : [];
         setMeetings(data);
       } catch (err) {
-        setMeetings([]);
+        if (!cancelled) {
+          setMeetings([]);
+        }
       } finally {
-        setLoadingMeetings(false);
+        if (!cancelled) {
+          setLoadingMeetings(false);
+        }
       }
     };
 
     fetchMeetings();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading]);
+
+  useEffect(() => {
+    if (loading || !user) return;
+    let cancelled = false;
+    const fetchAssignments = async () => {
+      setLoadingAssignments(true);
+      try {
+        const userId = user?.id || user?.userId || user?._id;
+        let res;
+        if (userId !== undefined && userId !== null && userId !== "") {
+          res = await api.get(`/Student/assignment/all/${userId}?IsCard=true`, { timeout: 15000 });
+        }
+        if (cancelled) return;
+        const assignmentData = res?.data;
+        if (!assignmentData || (Array.isArray(assignmentData) && assignmentData.length === 0)) {
+          setAssignments([]);
+          return;
+        }
+        const data = Array.isArray(assignmentData) ? assignmentData : assignmentData ? [assignmentData] : [];
+        setAssignments(data);
+      } catch (err) {
+        if (!cancelled) {
+          setAssignments([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingAssignments(false);
+        }
+      }
+    };
+
+    fetchAssignments();
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading]);
 
   const checkScroll = () => {
@@ -128,7 +190,7 @@ const HomePage = () => {
     const container = scrollContainerRef.current;
     setCanScrollLeft(container.scrollLeft > 0);
     setCanScrollRight(
-      container.scrollLeft + container.clientWidth < container.scrollWidth - 1
+      container.scrollLeft + container.clientWidth < container.scrollWidth - 1,
     );
   };
 
@@ -162,24 +224,46 @@ const HomePage = () => {
   }, [lessons]);
 
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
-          Dashboard
-        </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">
-          Your overview at a glance.
-        </p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
+            Dashboard
+          </h1>
+          <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
+            Your overview at a glance.
+          </p>
+        </div>
       </div>
 
-      <div className="mb-8 w-full">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 max-w-[50%] truncate">
-          Newest Lesson Uploads
-        </h2>
+      {isGuest && (
+        <div
+          className="rounded-xl px-4 py-3 sm:px-5 sm:py-4"
+          style={{
+            backgroundColor: "rgba(251, 191, 36, 0.18)",
+            border: "1px solid #f59e0b",
+          }}
+        >
+          <p className="m-0 text-sm sm:text-base font-medium text-amber-600">
+            As a guest user you will be authorized to read and preveiw pages only and not preform any actions
+          </p>
+        </div>
+      )}
+
+      <section
+        className="bg-white border rounded-2xl p-4 sm:p-6"
+        style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+      >
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 m-0">
+            Newest Lesson Uploads
+          </h2>
+        </div>
         <div className="flex items-center gap-3 w-full">
           <button
             onClick={() => handleScroll("left")}
-            className={`flex-shrink-0 p-2 rounded-full border border-gray-300 bg-white transition-colors ${canScrollLeft ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+            className={`flex-shrink-0 p-2.5 rounded-full border bg-white transition-all ${canScrollLeft ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+            style={{ borderColor: "var(--color-border-primary)" }}
             aria-label="Previous lessons"
             disabled={!canScrollLeft}
           >
@@ -189,7 +273,7 @@ const HomePage = () => {
           <div
             ref={scrollContainerRef}
             onScroll={checkScroll}
-            className="flex-1 w-full overflow-x-auto overflow-y-hidden flex gap-4 scroll-smooth [&::-webkit-scrollbar]:hidden"
+            className="flex-1 w-full overflow-x-auto overflow-y-hidden flex gap-4 scroll-smooth [&::-webkit-scrollbar]:hidden py-1"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {loadingLessons ? (
@@ -202,9 +286,9 @@ const HomePage = () => {
                 </div>
               ))
             ) : lessons.length > 0 ? (
-              lessons.map((lesson) => (
+              lessons.map((lesson, i) => (
                 <div
-                  key={lesson.id || lesson._id}
+                  key={lesson.id || lesson._id || i}
                   className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] h-64"
                 >
                   <LessonCard
@@ -212,21 +296,38 @@ const HomePage = () => {
                     title={lesson?.title}
                     subject={lesson?.subject}
                     description={lesson?.notes}
+                    type={
+                      lesson?.type ??
+                      lesson?.Type ??
+                      lesson?.lessonType ??
+                      lesson?.LessonType ??
+                      lesson?.lesson_type ??
+                      lesson?.kind
+                    }
+                    truncateTitle
+                    truncateNotes
                   />
                 </div>
               ))
             ) : (
-              <div className="w-full h-64 flex items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl text-gray-500 text-sm">
+              <div
+                className="w-full h-64 flex items-center justify-center bg-gray-50 border rounded-2xl text-gray-500 text-sm"
+                style={{ borderColor: "var(--color-border-primary)" }}
+              >
                 No lessons available
               </div>
             )}
             {showSeeMore && lessons.length >= 5 && (
-              <div className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] h-64 flex items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl">
+              <div
+                className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] h-64 flex items-center justify-center bg-gray-50 border rounded-2xl"
+                style={{ borderColor: "var(--color-border-primary)" }}
+              >
                 <button
                   onClick={handleSeeMore}
-                  className="px-6 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 font-semibold hover:bg-gray-50 transition-colors shadow-sm"
+                  className="px-6 py-3 bg-white border rounded-xl text-gray-900 font-semibold hover:bg-gray-50 transition-colors"
+                  style={{ borderColor: "var(--color-border-primary)" }}
                 >
-                  see more
+                  See more
                 </button>
               </div>
             )}
@@ -234,18 +335,20 @@ const HomePage = () => {
 
           <button
             onClick={() => handleScroll("right")}
-            className={`flex-shrink-0 p-2 rounded-full border border-gray-300 bg-white transition-colors ${canScrollRight ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+            className={`flex-shrink-0 p-2.5 rounded-full border bg-white transition-all ${canScrollRight ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+            style={{ borderColor: "var(--color-border-primary)" }}
             aria-label="Next lessons"
             disabled={!canScrollRight}
           >
             <FiChevronRight size={20} />
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <QuizExamCard quizzes={quizzes || []} loading={loadingQuizzes} />
-        <OnlineMeetingCard meetings={meetings || []} loading={loadingMeetings} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+        <QuizExamCard quizzes={quizzes || []} loading={loadingQuizzes} truncateTitles />
+        <AssignmentCard assignments={assignments || []} loading={loadingAssignments} truncateTitles />
+        <OnlineMeetingCard meetings={meetings || []} loading={loadingMeetings} truncateTitles />
       </div>
     </div>
   );

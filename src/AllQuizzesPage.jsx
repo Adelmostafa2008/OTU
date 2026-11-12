@@ -1,90 +1,200 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "./AxiosHelper";
+import { useAuth } from "./AuthContext";
+import { ListRowSkeleton } from "./Skeleton";
+
+const PAGE_SIZE = 12;
+
+const formatDate = (dateString) => {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  const options = { year: "numeric", month: "short", day: "numeric" };
+  return date.toLocaleDateString(undefined, options);
+};
+
+const extractItems = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.quizzes)) return payload.quizzes;
+  return [];
+};
+
+const extractTotalPages = (payload, itemsLength, page) => {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const raw =
+      payload.totalPages ??
+      payload.total_pages ??
+      payload.pages ??
+      payload.pageCount ??
+      payload.page_count;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.max(1, Math.ceil(n));
+    const total =
+      payload.total ??
+      payload.totalCount ??
+      payload.total_count ??
+      payload.count;
+    const t = Number(total);
+    if (Number.isFinite(t) && t >= 0) return Math.max(1, Math.ceil(t / PAGE_SIZE));
+  }
+  if (itemsLength === 0) return Math.max(1, page);
+  if (itemsLength < PAGE_SIZE) return page;
+  return page + 1;
+};
 
 const AllQuizzesPage = () => {
   const navigate = useNavigate();
-  const quizzes = [
-    {
-      id: "q1",
-      title: "Midterm Exam",
-      date: "2026-11-05",
-      description: "Covers chapters 1-4",
-      faculty: "Engineering",
-      division: "A",
-      subject: "Computer Science",
-      year: "2nd Year",
-      semester: "Fall",
-      notes: "Bring calculator",
-    },
-    {
-      id: "q2",
-      title: "Quiz 1",
-      date: "2026-10-28",
-      description: null,
-      faculty: "Engineering",
-      division: "B",
-      subject: "Mathematics",
-      year: "1st Year",
-      semester: "Fall",
-      notes: null,
-    },
-    {
-      id: "q3",
-      title: "Lab Quiz",
-      date: "2026-11-10",
-      description: "Practical based quiz",
-    },
-    {
-      id: "q4",
-      title: "Final Practice",
-      date: "2026-12-01",
-      description: "Mock exam",
-    },
-    {
-      id: "q5",
-      title: "Pop Quiz",
-      date: "2026-10-30",
-      description: null,
-    },
-    {
-      id: "q6",
-      title: "Extra Quiz",
-      date: "2026-12-05",
-      description: "Additional assessment",
-    },
-  ];
+  const { user, loading: authLoading } = useAuth();
+  const [quizzes, setQuizzes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setQuizzes([]);
+      setLoading(false);
+      setTotalPages(1);
+      return;
+    }
+
+    const userId = user?.id || user?.userId || user?._id;
+    if (userId === undefined || userId === null || userId === "") {
+      setQuizzes([]);
+      setLoading(false);
+      setTotalPages(1);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchQuizzes = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get(
+          `/Student/quiz/${userId}?IsCard=false&PageNum=${page}`,
+          { timeout: 15000 }
+        );
+        if (cancelled) return;
+        const payload = res?.data;
+        const items = extractItems(payload);
+        setQuizzes(items);
+        setTotalPages(extractTotalPages(payload, items.length, page));
+      } catch (err) {
+        if (!cancelled) {
+          setQuizzes([]);
+          setTotalPages(Math.max(1, page));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchQuizzes();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, page]);
 
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Quizzes/Exams
         </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">All quizzes and exams</p>
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
+          All quizzes and exams
+        </p>
       </div>
 
-      <div className="max-w-3xl space-y-2">
-        {quizzes.map((item) => {
-          const id = item.id || item._id;
-          const title = item.title || item.name || "Untitled Quiz";
-          const date = item.date || item.quizDate || item.QuizDate || "";
-          const description = item.description || item.notes || null;
+      <div className="max-w-4xl mx-auto w-full space-y-3">
+        {loading || authLoading ? (
+          Array.from({ length: 5 }).map((_, index) => (
+            <ListRowSkeleton key={`quiz-row-skeleton-${index}`} />
+          ))
+        ) : quizzes.length === 0 ? (
+          <div
+            className="w-full bg-white border rounded-2xl px-5 py-8 text-sm text-gray-500 text-center"
+            style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+          >
+            No quizzes added yet
+          </div>
+        ) : (
+          quizzes.map((item, index) => {
+            const id = item.id || item._id || `${page}-${index}`;
+            const title = item.title || item.name || "Untitled Quiz";
+            const date = item.date || item.quizDate || item.QuizDate || "";
+            const formattedDate = formatDate(date);
+            const description = item.description || item.notes || null;
 
-          return (
-            <button
-              key={id}
-              onClick={() => navigate(`/quiz/${id}`, { state: { quiz: item } })}
-              className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)] min-w-0"
-            >
-              <div className="flex-1 min-w-0">
-                <span className="text-sm sm:text-base font-semibold text-gray-900 max-w-[50%] truncate block">{title}</span>
-                {description ? (
-                  <p className="m-0 text-xs sm:text-sm text-gray-600 leading-relaxed mt-1 whitespace-normal break-words w-full">{description}</p>
+            return (
+              <button
+                key={id}
+                onClick={() => navigate(`/quiz/${id}`, { state: { quiz: item } })}
+                className="w-full text-left bg-white border rounded-2xl px-5 py-4 flex items-center justify-between gap-4 transition-all hover:-translate-y-[1px]"
+                style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-base font-semibold text-gray-900 break-words block">
+                    {title}
+                  </span>
+                  {description ? (
+                    <p
+                      className="m-0 text-sm text-gray-600 leading-relaxed mt-1 break-words w-full"
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                      title={String(description)}
+                    >
+                      {description}
+                    </p>
+                  ) : null}
+                </div>
+                {formattedDate ? (
+                  <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap flex-shrink-0">
+                    {formattedDate}
+                  </span>
                 ) : null}
-              </div>
-              {date ? <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{date}</span> : null}
+              </button>
+            );
+          })
+        )}
+
+        {!loading && !authLoading && (quizzes.length > 0 || page > 1) ? (
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: "var(--color-border-primary)" }}
+            >
+              Previous
             </button>
-          );
-        })}
+            <span className="text-sm text-gray-600">
+              Page {page}{totalPages > page ? ` of ${totalPages}` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={loading || page >= totalPages}
+              className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: "var(--color-border-primary)" }}
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

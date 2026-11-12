@@ -22,34 +22,46 @@ const formatMeetingDateTime = (dateString) => {
   if (isNaN(date.getTime())) return { formattedDate: dateString, formattedTime: null };
   const options = { year: "numeric", month: "short", day: "numeric" };
   const formattedDate = date.toLocaleDateString(undefined, options);
-  const formattedTime = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "numeric" });
+  const formattedTime = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "numeric",
+  });
   return { formattedDate, formattedTime };
 };
 
-const OnlineMeetingCard = ({ meetings = [], loading = false }) => {
+const OnlineMeetingCard = ({ meetings = [], loading = false, truncateTitles = false }) => {
   const navigate = useNavigate();
   const displayItems = Array.isArray(meetings) ? meetings.slice(0, 5) : [];
 
   return (
-    <article className="bg-white border-gray-200 rounded-xl overflow-hidden w-full shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)] transition-[transform,box-shadow]">
-      <div className="px-3 py-2 sm:px-4 sm:py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="m-0 text-sm sm:text-base font-bold text-gray-900 leading-snug max-w-[50%] truncate">
+    <article
+      className="bg-white border rounded-2xl overflow-hidden w-full"
+      style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+    >
+      <div
+        className="px-5 py-4 border-b flex items-center justify-between"
+        style={{ borderColor: "var(--color-border-primary)", backgroundColor: "rgba(255,255,255,0.7)" }}
+      >
+        <h3 className="m-0 text-base sm:text-lg font-bold text-gray-900 leading-snug">
           Online Meetings
         </h3>
       </div>
 
-      <div className="space-y-2 p-3">
+      <div className="space-y-2.5 p-4 sm:p-5">
         {loading ? (
           Array.from({ length: 3 }).map((_, index) => (
             <ListRowSkeleton key={`meeting-skeleton-${index}`} />
           ))
-        ) : displayItems.length === 0  || !displayItems ? (
+        ) : displayItems.length === 0 || !displayItems ? (
           <button
             key="meeting-placeholder-0"
             onClick={(e) => e.preventDefault()}
-            className="w-full text-left bg-white border border-gray-200 rounded-lg py-2.5 sm:py-3 px-3 sm:px-4 flex items-center justify-between gap-4 cursor-default"
+            className="w-full text-left bg-gray-50 border rounded-xl py-4 px-4 flex items-center justify-between gap-4 cursor-default"
+            style={{ borderColor: "var(--color-border-primary)" }}
           >
-            <span className="text-sm font-medium text-gray-500 text-left">No online meetings added yet</span>
+            <span className="text-sm font-medium text-gray-500 text-left">
+              No online meetings added yet
+            </span>
             <div className="text-right">
               <div className="text-xs text-gray-400">-</div>
             </div>
@@ -58,7 +70,8 @@ const OnlineMeetingCard = ({ meetings = [], loading = false }) => {
           displayItems.map((item, index) => {
             const id = item.id || item._id || index;
             const title = item.title || item.name || "Untitled Meeting";
-            const date = item.OnlineMeetingDate || item.meetingDate || item.date || item.createdAt || "";
+            const date =
+              item.OnlineMeetingDate || item.meetingDate || item.date || item.createdAt || "";
             const daysLeft = getDaysLeft(date);
             const formatted = formatMeetingDateTime(date);
 
@@ -74,9 +87,12 @@ const OnlineMeetingCard = ({ meetings = [], loading = false }) => {
                 <button
                   key={id}
                   onClick={(e) => e.preventDefault()}
-                  className="w-full text-left bg-white border border-gray-200 rounded-lg py-2.5 sm:py-3 px-3 sm:px-4 flex items-center justify-between gap-4 cursor-default"
+                  className="w-full text-left bg-gray-50 border rounded-xl py-3.5 px-4 flex items-center justify-between gap-4 cursor-default"
+                  style={{ borderColor: "var(--color-border-primary)" }}
                 >
-                  <span className="text-sm font-medium text-gray-500 text-left">{title || "No online meetings added yet"}</span>
+                  <span className="text-sm font-medium text-gray-500 text-left">
+                    {title || "No online meetings added yet"}
+                  </span>
                   <div className="text-right">
                     <div className="text-xs text-gray-400">-</div>
                   </div>
@@ -88,15 +104,33 @@ const OnlineMeetingCard = ({ meetings = [], loading = false }) => {
               <button
                 key={id}
                 onClick={() => navigate(`/meeting/${id}`, { state: { meeting: item } })}
-                className="w-full text-left bg-white border border-gray-200 rounded-lg py-2.5 sm:py-3 px-3 sm:px-4 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
+                className="w-full text-left bg-white border rounded-xl py-3.5 px-4 flex items-center justify-between gap-4 transition-all hover:-translate-y-[1px]"
+                style={{ borderColor: "var(--color-border-primary)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 6px 18px rgba(16,24,40,0.06)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "none";
+                }}
               >
-                <span className="text-sm font-medium text-gray-900 text-left max-w-[50%] truncate">{title}</span>
-                <div className="text-right">
+                <span
+                  className={`text-sm sm:text-[15px] font-semibold text-gray-900 text-left min-w-0 flex-1 ${
+                    truncateTitles ? "truncate" : "break-words"
+                  }`}
+                  title={truncateTitles ? title : undefined}
+                >
+                  {title}
+                </span>
+                <div className="text-right flex-shrink-0">
                   {formatted ? (
                     <>
-                      <div className="text-xs text-gray-500 whitespace-nowrap">{formatted.formattedDate}</div>
+                      <div className="text-xs text-gray-500 whitespace-nowrap">
+                        {formatted.formattedDate}
+                      </div>
                       {formatted.formattedTime ? (
-                        <div className="text-xs text-gray-500 whitespace-nowrap">at {formatted.formattedTime}</div>
+                        <div className="text-xs text-gray-500 whitespace-nowrap">
+                          at {formatted.formattedTime}
+                        </div>
                       ) : null}
                     </>
                   ) : date ? (
@@ -105,7 +139,10 @@ const OnlineMeetingCard = ({ meetings = [], loading = false }) => {
                     <div className="text-xs text-gray-500">No date</div>
                   )}
                   {daysLeft !== null ? (
-                    <div className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--color-brand-primary)' }}>
+                    <div
+                      className="text-xs font-semibold whitespace-nowrap mt-0.5"
+                      style={{ color: "var(--color-brand-primary)" }}
+                    >
                       {daysLeft === 0 ? "Today" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
                     </div>
                   ) : null}
@@ -117,10 +154,11 @@ const OnlineMeetingCard = ({ meetings = [], loading = false }) => {
       </div>
 
       {Array.isArray(meetings) && meetings.length > 5 ? (
-        <div className="px-4 py-3 sm:px-5 sm:py-3.5">
+        <div className="px-4 pb-4 sm:px-5 sm:pb-5">
           <button
             onClick={() => navigate("/meetings")}
-            className="w-full rounded-xl border border-gray-300 bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 px-3.5 py-2.5"
+            className="w-full rounded-xl border bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 px-3.5 py-2.5"
+            style={{ borderColor: "var(--color-border-primary)" }}
           >
             Show all
           </button>

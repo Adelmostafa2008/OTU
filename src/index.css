@@ -13,14 +13,15 @@
   --color-text-tertiary: #6b7280;
   --color-text-muted: #9ca3af;
   --color-text-light: #d1d5db;
+  --color-text-white: #ffffff;
 
   /* Background Colors */
   --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f9fafb;
+  --color-bg-secondary: #f6f7f9;
   --color-bg-tertiary: #f3f4f6;
 
   /* Border Colors */
-  --color-border-primary: #e5e7eb;
+  --color-border-primary: #e7e9ee;
   --color-border-secondary: #d1d5db;
   --color-border-hover: #fca5a5;
 
@@ -47,9 +48,57 @@
   --color-info-icon: #3b82f6;
 
   /* Shadow Colors */
-  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02);
-  --shadow-modal: 0 10px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
-  --shadow-snackbar: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+  --shadow-modal: 0 12px 40px rgba(16, 24, 40, 0.14);
+  --shadow-snackbar: 0 8px 24px rgba(16, 24, 40, 0.16);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--color-text-primary);
+  background:
+    radial-gradient(1200px 500px at 20% -10%, rgba(158, 194, 70, 0.08), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(17, 24, 39, 0.04), transparent 55%),
+    var(--color-bg-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Consistent, centered page content used across routed pages */
+.page-shell {
+  width: 100%;
+  max-width: 80rem; /* ~max-w-7xl */
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2rem 1rem 3rem;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .page-shell {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-shell {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.surface-card {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-card);
 }
 
 /* Skeleton loading shimmer */

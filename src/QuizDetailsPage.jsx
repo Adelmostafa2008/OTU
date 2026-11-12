@@ -27,12 +27,19 @@ const formatDate = (dateString) => {
   const options = { year: "numeric", month: "short", day: "numeric" };
   return date.toLocaleDateString(undefined, options);
 };
+const getUploaderDisplayName = (item) => {
+  const fullName = item?.uploadername ?? item?.uplodername ?? item?.uploaderName;
+  if (typeof fullName !== "string") return null;
+  const parts = fullName.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts.slice(0, 2).join(" ");
+};
 
 const QuizDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { ShowSnackBar } = useSnack();
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,17 +48,17 @@ const QuizDetailsPage = () => {
     const fetchQuiz = async () => {
       try {
         setLoading(true);
-        const userId = user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
-        const response = await api.get(`/Quizzes/single/${id}?user_id=${userId}`);
+        const userId =
+          user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
+        const response = await api.get(`/Student/quiz/single/${id}?user_id=${userId}`);
         if (response?.data) {
           setQuiz(response.data);
         } else {
           setQuiz(null);
         }
       } catch (e) {
-          setQuiz(null);
-        }
-       finally {
+        setQuiz(null);
+      } finally {
         setLoading(false);
       }
     };
@@ -62,6 +69,7 @@ const QuizDetailsPage = () => {
   const canEdit = user && (user.role === "admin" || user.role === "instructor");
 
   const handleDelete = async () => {
+    if (isGuest) return;
     const confirmed = window.confirm("Are you sure you want to delete this quiz/exam?");
     if (!confirmed) return;
 
@@ -71,9 +79,7 @@ const QuizDetailsPage = () => {
       navigate("/");
     } catch (err) {
       const serverMsg =
-        err?.response?.data?.message ??
-        err?.response?.data?.error ??
-        null;
+        err?.response?.data?.message ?? err?.response?.data?.error ?? null;
       ShowSnackBar(serverMsg || "Failed to delete.", "error");
     }
   };
@@ -89,8 +95,13 @@ const QuizDetailsPage = () => {
   const data = quiz;
   if (!data) {
     return (
-      <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-        <div className="text-sm text-gray-500">Quiz not found.</div>
+      <div className="max-w-3xl mx-auto">
+        <div
+          className="bg-white border rounded-2xl px-6 py-10 text-sm text-gray-500 text-center"
+          style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+        >
+          Quiz not found.
+        </div>
       </div>
     );
   }
@@ -99,36 +110,46 @@ const QuizDetailsPage = () => {
   const daysLeft = getDaysLeft(date);
   const formattedDate = formatDate(date);
   const description = data.description || data.notes || null;
+  const uploaderDisplayName = getUploaderDisplayName(data);
+
+  const infoFields = [
+    { label: "Description/Notes", value: description || "No description assigned" },
+    { label: "Faculty", value: data.faculty },
+    { label: "Division", value: data.division },
+    { label: "Subject", value: data.subject },
+    { label: "Year", value: data.year },
+    { label: "Semester", value: data.semester },
+  ].filter((f) => f.value !== undefined && f.value !== null && f.value !== "");
 
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8 flex items-start justify-between gap-4">
+    <div className="space-y-6 max-w-4xl mx-auto w-full">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight  truncate">
+          <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight break-words">
             {title}
           </h1>
           {date ? (
-            <div className="flex flex-col gap-1">
-              {formattedDate ? (
-                <>
-                  <p className="m-0 mt-2 text-base font-medium text-gray-700">{formattedDate}</p>
-                </>
-              ) : (
-                <p className="m-0 mt-2 text-base font-medium text-gray-700">{date}</p>
-              )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+              <p className="m-0 text-base font-medium text-gray-700">
+                {formattedDate || date}
+              </p>
               {daysLeft !== null ? (
-                <p className="m-0 text-sm font-semibold" style={{ color: 'var(--color-brand-primary)' }}>
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--color-brand-primary)" }}
+                >
                   {daysLeft === 0 ? "Today" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
-                </p>
+                </span>
               ) : null}
             </div>
           ) : null}
         </div>
         {canEdit ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleEdit}
-              className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 px-3.5 py-2.5"
+              className="flex items-center gap-2 rounded-xl border bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 px-3.5 py-2.5"
+              style={{ borderColor: "var(--color-border-primary)" }}
               aria-label="Edit"
             >
               <FiEdit2 size={16} />
@@ -136,7 +157,8 @@ const QuizDetailsPage = () => {
             </button>
             <button
               onClick={handleDelete}
-              className="flex items-center gap-2 rounded-xl border border-red-300 bg-white text-red-600 font-semibold text-sm cursor-pointer transition-colors hover:bg-red-50 px-3.5 py-2.5"
+              disabled={isGuest}
+              className={`flex items-center gap-2 rounded-xl border border-red-300 bg-white text-red-600 font-semibold text-sm cursor-pointer transition-colors hover:bg-red-50 px-3.5 py-2.5 ${isGuest ? "opacity-60 pointer-events-none" : ""}`}
               aria-label="Delete"
             >
               <FiTrash2 size={16} />
@@ -146,41 +168,44 @@ const QuizDetailsPage = () => {
         ) : null}
       </div>
 
-      <div className="max-w-3xl bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)] space-y-4">
-        <div className="min-w-0">
-          <h2 className="m-0 mb-1 text-sm font-semibold text-gray-700 max-w-[50%] truncate">Description/Notes</h2>
-          <p className="m-0 text-sm text-gray-600 leading-relaxed whitespace-normal break-words w-full">{description || "No Description Assigned"}</p>
-        </div>
-        {data.faculty ? (
-          <div className="min-w-0">
-            <h2 className="m-0 mb-1 text-sm font-semibold text-gray-700 max-w-[50%] truncate">Faculty</h2>
-            <p className="m-0 text-sm text-gray-600 whitespace-normal break-words w-full">{data.faculty}</p>
+      <div
+        className="bg-white border rounded-2xl p-6 sm:p-8 space-y-5"
+        style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+      >
+        {uploaderDisplayName && (
+          <div className="flex justify-end">
+            <div
+              className="inline-flex items-center gap-2.5 rounded-full border border-gray-200/80 bg-white/90 pl-2 pr-3.5 py-1.5 shadow-sm backdrop-blur-sm"
+              title={`Uploaded by ${uploaderDisplayName}`}
+            >
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-inner"
+                style={{ background: "linear-gradient(135deg, var(--color-brand-primary), #7c3aed)" }}
+                aria-hidden="true"
+              >
+                {uploaderDisplayName.charAt(0).toUpperCase()}
+              </span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                  Uploaded by
+                </span>
+                <span className="text-sm font-semibold text-gray-900 max-w-[10rem] truncate">
+                  {uploaderDisplayName}
+                </span>
+              </span>
+            </div>
           </div>
-        ) : null}
-        {data.division ? (
-          <div className="min-w-0">
-            <h2 className="m-0 mb-1 text-sm font-semibold text-gray-700 max-w-[50%] truncate">Division</h2>
-            <p className="m-0 text-sm text-gray-600 whitespace-normal break-words w-full">{data.division}</p>
+        )}
+        {infoFields.map((field) => (
+          <div key={field.label} className="min-w-0">
+            <h2 className="m-0 mb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {field.label}
+            </h2>
+            <p className="m-0 text-sm sm:text-base text-gray-700 leading-relaxed whitespace-normal break-words w-full">
+              {field.value}
+            </p>
           </div>
-        ) : null}
-        {data.subject ? (
-          <div className="min-w-0">
-            <h2 className="m-0 mb-1 text-sm font-semibold text-gray-700 max-w-[50%] truncate">Subject</h2>
-            <p className="m-0 text-sm text-gray-600 whitespace-normal break-words w-full">{data.subject}</p>
-          </div>
-        ) : null}
-        {data.year ? (
-          <div className="min-w-0">
-            <h2 className="m-0 mb-1 text-sm font-semibold text-gray-700 max-w-[50%] truncate">Year</h2>
-            <p className="m-0 text-sm text-gray-600 whitespace-normal break-words w-full">{data.year}</p>
-          </div>
-        ) : null}
-        {data.semester ? (
-          <div className="min-w-0">
-            <h2 className="m-0 mb-1 text-sm font-semibold text-gray-700 max-w-[50%] truncate">Semester</h2>
-            <p className="m-0 text-sm text-gray-600 whitespace-normal break-words w-full">{data.semester}</p>
-          </div>
-        ) : null}
+        ))}
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { useSnack } from "./SnackBarContext.jsx";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
 const ChangePassword = () => {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const navigate = useNavigate();
   const { ShowSnackBar } = useSnack();
   const [loading, setLoading] = useState(false);
@@ -44,6 +44,8 @@ const ChangePassword = () => {
   };
 
   const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isGuest) return;
     e.preventDefault();
 
     if (!formData.oldPassword || !formData.newPassword || !formData.confirmPassword) {
@@ -101,8 +103,8 @@ const ChangePassword = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight">
+      <div className="max-w-2xl mx-auto space-y-2">
+        <h1 className="m-0 text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Change Password
         </h1>
         <p className="m-0 mt-2 text-sm text-gray-500">No user data available.</p>
@@ -110,33 +112,40 @@ const ChangePassword = () => {
     );
   }
 
+  const fieldClass =
+    "w-full rounded-xl border bg-white px-3.5 py-3 pr-10 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
+
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Change Password
         </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
           Update your account password
         </p>
       </div>
 
-      <div className="max-w-2xl">
+      <div className="max-w-2xl mx-auto w-full">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]">
+          <div
+            className="bg-white border rounded-2xl p-6 sm:p-8"
+            style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+          >
             <div className="space-y-5">
               <div>
                 <label htmlFor="oldPassword" className="block text-sm font-semibold text-gray-700 mb-2">
                   Old Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <input
+                  <input readOnly={isGuest} disabled={isGuest}
                     id="oldPassword"
                     name="oldPassword"
                     type={showOldPassword ? "text" : "password"}
                     value={formData.oldPassword}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 pr-10 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20"
+                    className={fieldClass}
+                    style={{ borderColor: "var(--color-border-primary)" }}
                     required
                   />
                   <button
@@ -155,13 +164,14 @@ const ChangePassword = () => {
                   New Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <input
+                  <input readOnly={isGuest} disabled={isGuest}
                     id="newPassword"
                     name="newPassword"
                     type={showNewPassword ? "text" : "password"}
                     value={formData.newPassword}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 pr-10 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20"
+                    className={fieldClass}
+                    style={{ borderColor: "var(--color-border-primary)" }}
                     required
                   />
                   <button
@@ -180,13 +190,14 @@ const ChangePassword = () => {
                   Confirm New Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <input
+                  <input readOnly={isGuest} disabled={isGuest}
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 pr-10 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20"
+                    className={fieldClass}
+                    style={{ borderColor: "var(--color-border-primary)" }}
                     required
                   />
                   <button
@@ -201,21 +212,26 @@ const ChangePassword = () => {
               </div>
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isGuest}
                 className="px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3"
-                style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = 'var(--color-brand-primary-hover)')}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = 'var(--color-brand-primary)')}
+                style={{ backgroundColor: "var(--color-brand-primary)", color: "var(--color-text-white)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "var(--color-brand-primary)")
+                }
               >
                 {loading ? "Changing..." : "Change Password"}
               </button>
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="px-8 rounded-xl border border-gray-300 bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                className="px-8 rounded-xl border bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                style={{ borderColor: "var(--color-border-primary)" }}
               >
                 Cancel
               </button>

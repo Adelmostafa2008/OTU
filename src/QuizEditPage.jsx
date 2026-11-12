@@ -54,7 +54,7 @@ const QuizEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { ShowSnackBar } = useSnack();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!location.state?.quiz);
@@ -75,7 +75,9 @@ const QuizEditPage = () => {
     const fetchData = async () => {
       setFetching(true);
       try {
-        const response = await api.get("/Quizzes", { params: { id } });
+        const userId =
+          user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
+        const response = await api.get(`/Student/quiz/single/${id}?user_id=${userId}`);
         if (response?.data) {
           setFormData(response.data);
           setInitialData(response.data);
@@ -100,37 +102,55 @@ const QuizEditPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    let nextValue = value;
+    if (name === "title" && typeof value === "string") {
+      nextValue = value.slice(0, 100);
+    } else if (name === "notes" && typeof value === "string") {
+      nextValue = value.slice(0, 400);
+    }
     setFormData((prev) => {
-      const next = { ...prev, [name]: value };
+      const next = { ...prev, [name]: nextValue };
       if (name === "faculty") {
         next.division = "";
       }
       return next;
     });
   };
-
   const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isGuest) return;
     e.preventDefault();
     if (!formData.title?.trim()) {
       ShowSnackBar("Title is required.", "warn");
       return;
     }
+    if (String(formData.title ?? "").length > 100) {
+      ShowSnackBar("Title must be at most 100 characters.", "warn");
+      return;
+    }
+    const notesVal = formData.notes || formData.description || "";
+    if (notesVal && String(notesVal).length > 400) {
+      ShowSnackBar("Notes must be at most 400 characters.", "warn");
+      return;
+    }
 
-    const quizDateValue = formData.quizDate || formData.QuizDate || formData.date;
-    if (quizDateValue) {
-      const selectedDate = new Date(quizDateValue + "T00:00:00");
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) {
-        ShowSnackBar("Please select today or a future date for the quiz.", "warn");
-        return;
+    const dateVal = getQuizDateValue();
+    if (dateVal) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateVal);
+      if (match) {
+        const selectedDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (selectedDate < today) {
+          ShowSnackBar("Please select today or a future date for the quiz.", "warn");
+          return;
+        }
       }
     }
 
     setLoading(true);
     try {
       const payload = preparePayload(formData);
-      const dateVal = getQuizDateValue();
       if (dateVal) {
         payload.QuizDate = dateVal;
         payload.quizDate = dateVal;
@@ -141,9 +161,7 @@ const QuizEditPage = () => {
       navigate(`/quiz/${id}`, { state: { quiz: payload } });
     } catch (err) {
       const serverMsg =
-        err?.response?.data?.message ??
-        err?.response?.data?.error ??
-        null;
+        err?.response?.data?.message ?? err?.response?.data?.error ?? null;
       ShowSnackBar(serverMsg || "Failed to update quiz.", "error");
     } finally {
       setLoading(false);
@@ -159,12 +177,13 @@ const QuizEditPage = () => {
   }
 
   const inputClass =
-    "w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20";
+    "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
   const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
   const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
+  const fieldStyle = { borderColor: "var(--color-border-primary)" };
 
   const renderSubjects = (id, value) => (
-    <select id={id} name="subject" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="subject" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select subject</option>
       {SUBJECTS.map((option) => (
         <option key={option} value={option}>
@@ -175,7 +194,7 @@ const QuizEditPage = () => {
   );
 
   const renderFaculties = (id, value) => (
-    <select id={id} name="faculty" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="faculty" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select faculty</option>
       {FACULTIES.map((option) => (
         <option key={option} value={option}>
@@ -188,12 +207,13 @@ const QuizEditPage = () => {
   const renderDivisions = (id, faculty, value) => {
     const options = DIVISIONS_BY_FACULTY[faculty] || [];
     return (
-      <select
+      <select disabled={isGuest}
         id={id}
         name="division"
         value={value || ""}
         onChange={handleChange}
         className={selectClass}
+        style={fieldStyle}
         disabled={options.length === 0}
         required
       >
@@ -210,7 +230,7 @@ const QuizEditPage = () => {
   };
 
   const renderYears = (id, value) => (
-    <select id={id} name="year" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="year" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select year</option>
       {YEARS.map((option) => (
         <option key={option} value={option}>
@@ -221,7 +241,7 @@ const QuizEditPage = () => {
   );
 
   const renderSemesters = (id, value) => (
-    <select id={id} name="semester" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="semester" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select semester</option>
       {SEMESTERS.map((option) => (
         <option key={option} value={option}>
@@ -279,29 +299,34 @@ const QuizEditPage = () => {
   const isDirty = hasChanges();
 
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight w-full">
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Edit Quiz/Exam
         </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">Update quiz or exam details</p>
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">Update quiz or exam details</p>
       </div>
 
-      <div className="max-w-3xl">
+      <div className="max-w-4xl mx-auto w-full">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]">
+          <div
+            className="bg-white border rounded-2xl p-6 sm:p-8"
+            style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+          >
             <div className="space-y-5">
               <div>
                 <label htmlFor="title" className={labelClass}>
                   Title <span className="text-red-500">*</span>
                 </label>
-                <input
+                <input readOnly={isGuest} disabled={isGuest}
                   id="title"
                   name="title"
                   type="text"
+                  maxLength={100}
                   value={formData.title || ""}
                   onChange={handleChange}
                   className={inputClass}
+                  style={fieldStyle}
                   required
                 />
               </div>
@@ -346,13 +371,14 @@ const QuizEditPage = () => {
                 <label htmlFor="quizDate" className={labelClass}>
                   Quiz Date (only date) <span className="text-red-500">*</span>
                 </label>
-                <input
+                <input readOnly={isGuest} disabled={isGuest}
                   id="quizDate"
                   name="QuizDate"
                   type="date"
                   value={quizDateValue}
                   onChange={handleChange}
                   className={inputClass}
+                  style={fieldStyle}
                   required
                 />
               </div>
@@ -361,29 +387,43 @@ const QuizEditPage = () => {
                 <label htmlFor="notes" className={labelClass}>
                   Notes
                 </label>
-                <textarea
+                <textarea readOnly={isGuest} disabled={isGuest}
                   id="notes"
                   name="notes"
+                  maxLength={400}
                   value={formData.notes || formData.description || ""}
                   onChange={handleChange}
                   rows={4}
                   className={`${inputClass} resize-none`}
+                  style={fieldStyle}
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="submit"
                 disabled={loading || !isDirty}
-                className="px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: '#ffffff', opacity: isDirty ? 1 : 0.5 }} onMouseEnter={(e) => { if (isDirty) e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'; }} onMouseLeave={(e) => { e.target.style.backgroundColor = 'var(--color-brand-primary)'; }}
+                className="px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3"
+                style={{
+                  backgroundColor: "var(--color-brand-primary)",
+                  color: "#ffffff",
+                  opacity: isDirty ? 1 : 0.5,
+                }}
+                onMouseEnter={(e) => {
+                  if (isDirty) e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--color-brand-primary)";
+                }}
               >
                 {loading ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="px-8 rounded-xl border border-gray-300 bg-white font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                className="px-8 rounded-xl border bg-white font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                style={{ borderColor: "var(--color-border-primary)" }}
               >
                 Cancel
               </button>
@@ -396,4 +436,3 @@ const QuizEditPage = () => {
 };
 
 export default QuizEditPage;
-

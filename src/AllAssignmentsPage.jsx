@@ -1,0 +1,210 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "./AxiosHelper";
+import { useAuth } from "./AuthContext";
+import { ListRowSkeleton } from "./Skeleton";
+
+const PAGE_SIZE = 12;
+
+const formatMeetingDateTime = (dateString) => {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return { formattedDate: dateString, formattedTime: null };
+  const options = { month: "short", day: "numeric", year: "numeric" };
+  const formattedDate = date.toLocaleDateString(undefined, options);
+  const formattedTime = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "numeric",
+  });
+  return { formattedDate, formattedTime };
+};
+
+const extractItems = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.assignments)) return payload.assignments;
+  return [];
+};
+
+const extractTotalPages = (payload, itemsLength, page) => {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const raw =
+      payload.totalPages ??
+      payload.total_pages ??
+      payload.pages ??
+      payload.pageCount ??
+      payload.page_count;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.max(1, Math.ceil(n));
+    const total =
+      payload.total ??
+      payload.totalCount ??
+      payload.total_count ??
+      payload.count;
+    const t = Number(total);
+    if (Number.isFinite(t) && t >= 0) return Math.max(1, Math.ceil(t / PAGE_SIZE));
+  }
+  if (itemsLength === 0) return Math.max(1, page);
+  if (itemsLength < PAGE_SIZE) return page;
+  return page + 1;
+};
+
+const AllAssignmentsPage = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setAssignments([]);
+      setLoading(false);
+      setTotalPages(1);
+      return;
+    }
+
+    const userId = user?.id || user?.userId || user?._id;
+    if (userId === undefined || userId === null || userId === "") {
+      setAssignments([]);
+      setLoading(false);
+      setTotalPages(1);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchAssignments = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get(
+          `/Student/assignment/all/${userId}?IsCard=false&PageNum=${page}`,
+          { timeout: 15000 }
+        );
+        if (cancelled) return;
+        const payload = res?.data;
+        const items = extractItems(payload);
+        setAssignments(items);
+        setTotalPages(extractTotalPages(payload, items.length, page));
+      } catch (err) {
+        if (!cancelled) {
+          setAssignments([]);
+          setTotalPages(Math.max(1, page));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchAssignments();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, page]);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
+          Assignments
+        </h1>
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
+          All assignments
+        </p>
+      </div>
+
+      <div className="max-w-4xl mx-auto w-full space-y-3">
+        {loading || authLoading ? (
+          Array.from({ length: 5 }).map((_, index) => (
+            <ListRowSkeleton key={`assignment-row-skeleton-${index}`} />
+          ))
+        ) : assignments.length === 0 ? (
+          <div
+            className="w-full bg-white border rounded-2xl px-5 py-8 text-sm text-gray-500 text-center"
+            style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+          >
+            No assignments added yet
+          </div>
+        ) : (
+          assignments.map((item, index) => {
+            const id = item.id || item._id || `${page}-${index}`;
+            const title = item.title || item.name || "Untitled Assignment";
+            const date = item.date || item.assignmentDate || item.OnlineMeetingDate || item.deadline || "";
+            const formatted = formatMeetingDateTime(date);
+            const description = item.description || item.notes || null;
+
+            return (
+              <button
+                key={id}
+                onClick={() => navigate(`/assignment/${id}`, { state: { assignment: item } })}
+                className="w-full text-left bg-white border rounded-2xl px-5 py-4 flex items-center justify-between gap-4 transition-all hover:-translate-y-[1px]"
+                style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-base font-semibold text-gray-900 break-words block">
+                    {title}
+                  </span>
+                  {description ? (
+                    <p
+                      className="m-0 text-sm text-gray-600 leading-relaxed mt-1 break-words w-full"
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                      title={String(description)}
+                    >
+                      {description}
+                    </p>
+                  ) : null}
+                </div>
+                {formatted ? (
+                  <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap flex-shrink-0">
+                    {formatted.formattedTime
+                      ? `${formatted.formattedDate} • ${formatted.formattedTime}`
+                      : formatted.formattedDate}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })
+        )}
+
+        {!loading && !authLoading && (assignments.length > 0 || page > 1) ? (
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: "var(--color-border-primary)" }}
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {page}{totalPages > page ? ` of ${totalPages}` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={loading || page >= totalPages}
+              className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ borderColor: "var(--color-border-primary)" }}
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
+export default AllAssignmentsPage;

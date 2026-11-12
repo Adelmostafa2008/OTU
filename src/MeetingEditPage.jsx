@@ -54,7 +54,7 @@ const MeetingEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { ShowSnackBar } = useSnack();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!location.state?.meeting);
@@ -75,7 +75,8 @@ const MeetingEditPage = () => {
     const fetchData = async () => {
       setFetching(true);
       try {
-        const response = await api.get(`/OnlineMeeting/${id}`);
+        const userId = user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
+        const response = await api.get(`/Student/meet/single/${id}?user_id=${userId}`);
         if (response?.data) {
           setFormData(response.data);
           setInitialData(response.data);
@@ -100,49 +101,65 @@ const MeetingEditPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    let nextValue = value;
+    if (name === "title" && typeof value === "string") {
+      nextValue = value.slice(0, 100);
+    } else if (name === "notes" && typeof value === "string") {
+      nextValue = value.slice(0, 400);
+    }
     setFormData((prev) => {
-      const next = { ...prev, [name]: value };
+      const next = { ...prev, [name]: nextValue };
       if (name === "faculty") {
         next.division = "";
       }
       return next;
     });
   };
-
   const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isGuest) return;
     e.preventDefault();
     if (!formData.title?.trim()) {
       ShowSnackBar("Title is required.", "warn");
       return;
     }
+    if (String(formData.title ?? "").length > 100) {
+      ShowSnackBar("Title must be at most 100 characters.", "warn");
+      return;
+    }
+    const notesVal = formData.notes || formData.description || "";
+    if (notesVal && String(notesVal).length > 400) {
+      ShowSnackBar("Notes must be at most 400 characters.", "warn");
+      return;
+    }
 
-    const meetingDateValue = formData.OnlineMeetingDate || formData.meetingDate || formData.date;
-    if (meetingDateValue) {
-      const selectedDate = new Date(meetingDateValue);
-      const now = new Date();
-      if (selectedDate < new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)) {
-        ShowSnackBar("Please select today or a future date and time for the online meeting.", "warn");
-        return;
+    const dateVal = getMeetingDateValue();
+    if (dateVal) {
+      const selectedDate = new Date(dateVal);
+      if (!isNaN(selectedDate.getTime())) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        if (selectedDate < todayStart) {
+          ShowSnackBar("Please select today or a future date and time for the online meeting.", "warn");
+          return;
+        }
       }
     }
 
     setLoading(true);
     try {
       const payload = preparePayload(formData);
-      const dateVal = getMeetingDateValue();
       if (dateVal) {
         payload.OnlineMeetingDate = dateVal;
-        if (!payload.meetingDate) payload.meetingDate = dateVal;
-        if (!payload.date) payload.date = dateVal;
+        payload.meetingDate = dateVal;
+        payload.date = dateVal;
       }
       await api.put(`/OnlineMeeting/${id}`, payload, { withCredentials: true });
       ShowSnackBar("Meeting updated successfully.", "success");
       navigate(`/meeting/${id}`, { state: { meeting: payload } });
     } catch (err) {
       const serverMsg =
-        err?.response?.data?.message ??
-        err?.response?.data?.error ??
-        null;
+        err?.response?.data?.message ?? err?.response?.data?.error ?? null;
       ShowSnackBar(serverMsg || "Failed to update meeting.", "error");
     } finally {
       setLoading(false);
@@ -158,12 +175,13 @@ const MeetingEditPage = () => {
   }
 
   const inputClass =
-    "w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20";
+    "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
   const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
   const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
+  const fieldStyle = { borderColor: "var(--color-border-primary)" };
 
   const renderSubjects = (id, value) => (
-    <select id={id} name="subject" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="subject" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select subject</option>
       {SUBJECTS.map((option) => (
         <option key={option} value={option}>
@@ -174,7 +192,7 @@ const MeetingEditPage = () => {
   );
 
   const renderFaculties = (id, value) => (
-    <select id={id} name="faculty" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="faculty" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select faculty</option>
       {FACULTIES.map((option) => (
         <option key={option} value={option}>
@@ -187,12 +205,13 @@ const MeetingEditPage = () => {
   const renderDivisions = (id, faculty, value) => {
     const options = DIVISIONS_BY_FACULTY[faculty] || [];
     return (
-      <select
+      <select disabled={isGuest}
         id={id}
         name="division"
         value={value || ""}
         onChange={handleChange}
         className={selectClass}
+        style={fieldStyle}
         disabled={options.length === 0}
         required
       >
@@ -209,7 +228,7 @@ const MeetingEditPage = () => {
   };
 
   const renderYears = (id, value) => (
-    <select id={id} name="year" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="year" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select year</option>
       {YEARS.map((option) => (
         <option key={option} value={option}>
@@ -220,7 +239,7 @@ const MeetingEditPage = () => {
   );
 
   const renderSemesters = (id, value) => (
-    <select id={id} name="semester" value={value || ""} onChange={handleChange} className={selectClass} required>
+    <select disabled={isGuest} id={id} name="semester" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select semester</option>
       {SEMESTERS.map((option) => (
         <option key={option} value={option}>
@@ -229,12 +248,30 @@ const MeetingEditPage = () => {
       ))}
     </select>
   );
-
   const getMeetingDateValue = () => {
     const raw = formData.OnlineMeetingDate || formData.meetingDate || formData.date || formData.OnlineMeeting_Time || formData.meeting_time || "";
     if (!raw) return "";
+
+    const toDateTimeLocal = (date) => {
+      if (!(date instanceof Date) || isNaN(date.getTime())) return "";
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    if (raw instanceof Date) return toDateTimeLocal(raw);
+
     if (typeof raw === "string") {
-      let s = raw.replace(" ", "T");
+      const trimmed = raw.trim();
+      if (!trimmed) return "";
+      // ISO-like with timezone/offset (e.g. ...Z, +03:00): parse to local components for datetime-local
+      if (/(Z|[+-]\d{2}:?\\d{2})$/i.test(trimmed)) {
+        return toDateTimeLocal(new Date(trimmed));
+      }
+      let s = trimmed.replace(" ", "T");
       if (s.includes(".")) s = s.split(".")[0];
       if (s.match(/T\d{2}:\d{2}:\d{2}/)) {
         s = s.replace(/(T\d{2}:\d{2}):\d{2}/, "$1");
@@ -242,18 +279,17 @@ const MeetingEditPage = () => {
         // already correct
       } else if (s.match(/T\d{2}$/)) {
         s = s + ":00";
+      } else if (!s.includes("T") && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        // date-only string; keep as-is won't fit datetime-local, but avoid corruption
+        return `${s}T00:00`;
       }
-      return s;
+      // Ensure valid datetime-local shape
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return s;
+      return toDateTimeLocal(new Date(trimmed));
     }
+
     try {
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) return "";
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const hours = String(d.getHours()).padStart(2, "0");
-      const minutes = String(d.getMinutes()).padStart(2, "0");
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
+      return toDateTimeLocal(new Date(raw));
     } catch {
       return "";
     }
@@ -282,29 +318,34 @@ const MeetingEditPage = () => {
   const isDirty = hasChanges();
 
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight w-full">
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Edit Online Meeting
         </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">Update online meeting details</p>
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">Update online meeting details</p>
       </div>
 
-      <div className="max-w-3xl">
+      <div className="max-w-4xl mx-auto w-full">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]">
+          <div
+            className="bg-white border rounded-2xl p-6 sm:p-8"
+            style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+          >
             <div className="space-y-5">
               <div>
                 <label htmlFor="meeting-title" className={labelClass}>
                   Title <span className="text-red-500">*</span>
                 </label>
-                <input
+                <input readOnly={isGuest} disabled={isGuest}
                   id="meeting-title"
                   name="title"
                   type="text"
+                  maxLength={100}
                   value={formData.title || ""}
                   onChange={handleChange}
                   className={inputClass}
+                  style={fieldStyle}
                   required
                 />
               </div>
@@ -349,13 +390,14 @@ const MeetingEditPage = () => {
                 <label htmlFor="meeting-date" className={labelClass}>
                   Online Meeting Date (date and time) <span className="text-red-500">*</span>
                 </label>
-                <input
+                <input readOnly={isGuest} disabled={isGuest}
                   id="meeting-date"
                   name="OnlineMeetingDate"
                   type="datetime-local"
                   value={meetingDateValue}
                   onChange={handleChange}
                   className={inputClass}
+                  style={fieldStyle}
                   required
                 />
               </div>
@@ -364,29 +406,43 @@ const MeetingEditPage = () => {
                 <label htmlFor="meeting-notes" className={labelClass}>
                   Notes
                 </label>
-                <textarea
+                <textarea readOnly={isGuest} disabled={isGuest}
                   id="meeting-notes"
                   name="notes"
+                  maxLength={400}
                   value={formData.notes || formData.description || ""}
                   onChange={handleChange}
                   rows={4}
                   className={`${inputClass} resize-none`}
+                  style={fieldStyle}
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="submit"
                 disabled={loading || !isDirty}
-                className="px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: '#ffffff', opacity: isDirty ? 1 : 0.5 }} onMouseEnter={(e) => { if (isDirty) e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'; }} onMouseLeave={(e) => { e.target.style.backgroundColor = 'var(--color-brand-primary)'; }}
+                className="px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3"
+                style={{
+                  backgroundColor: "var(--color-brand-primary)",
+                  color: "#ffffff",
+                  opacity: isDirty ? 1 : 0.5,
+                }}
+                onMouseEnter={(e) => {
+                  if (isDirty) e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--color-brand-primary)";
+                }}
               >
                 {loading ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="px-8 rounded-xl border border-gray-300 bg-white font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                className="px-8 rounded-xl border bg-white font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                style={{ borderColor: "var(--color-border-primary)" }}
               >
                 Cancel
               </button>
@@ -399,4 +455,3 @@ const MeetingEditPage = () => {
 };
 
 export default MeetingEditPage;
-

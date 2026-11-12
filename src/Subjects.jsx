@@ -69,40 +69,50 @@ const Subjects = () => {
       case "Workshop":
         return "bg-yellow-50 text-yellow-700 border-yellow-200";
       default:
-        return "bg-gray-50 text-gray-700 border-gray-200";
+        return "bg-gray-50 text-gray-700 border-gray-300";
     }
   };
 
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Subjects
         </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
           Browse your enrolled subjects and lessons
         </p>
       </div>
 
-      <div className="space-y-4 max-w-4xl">
+      <div className="space-y-4 max-w-4xl mx-auto w-full">
         {subjectsData.map((subject) => (
           <div
             key={subject.id}
-            className="border border-gray-200 rounded-2xl overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)] transition-all hover:shadow-[0_12px_32px_rgba(0,0,0,0.06),0_4px_10px_rgba(0,0,0,0.03)]"
+            className="bg-white border rounded-2xl overflow-hidden transition-all"
+            style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
           >
             <button
               onClick={() => toggleSubject(subject.id)}
-              className="w-full flex items-center gap-4 p-4 sm:p-5 bg-white hover:bg-gray-50 transition-colors text-left"
+              className="w-full flex items-center gap-4 p-4 sm:p-5 bg-white hover:bg-gray-50/70 transition-colors text-left"
             >
-              <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand-primary) 10%, transparent)' }}>
-                <FiFolder style={{ color: 'var(--color-brand-primary)' }} size={24} />
+              <div
+                className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: "color-mix(in srgb, var(--color-brand-primary) 10%, transparent)" }}
+              >
+                <FiFolder style={{ color: "var(--color-brand-primary)" }} size={24} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 min-w-0">
-                  <h3 className="text-lg font-bold text-gray-900 m-0 max-w-[50%] truncate">
+                <div className="flex items-center gap-2 mb-1 min-w-0 flex-wrap">
+                  <h3 className="text-lg font-bold text-gray-900 m-0 break-words">
                     {subject.name}
                   </h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-md flex-shrink-0" style={{ color: 'var(--color-brand-primary)', backgroundColor: 'color-mix(in srgb, var(--color-brand-primary) 10%, transparent)' }}>
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-md flex-shrink-0"
+                    style={{
+                      color: "var(--color-brand-primary)",
+                      backgroundColor: "color-mix(in srgb, var(--color-brand-primary) 10%, transparent)",
+                    }}
+                  >
                     {subject.code}
                   </span>
                 </div>
@@ -123,43 +133,45 @@ const Subjects = () => {
             </button>
 
             {expandedSubject === subject.id && (
-              <div className="border-t border-gray-200 bg-gray-50">
+              <div className="border-t bg-gray-50/60" style={{ borderColor: "var(--color-border-primary)" }}>
                 <div className="p-4 sm:p-5 space-y-2">
                   {subject.lessons.map((lesson) => (
                     <div
                       key={lesson.id}
-                      className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 transition-all cursor-pointer group"
+                      className="flex items-center gap-3 p-3 bg-white rounded-xl border transition-all cursor-pointer group"
+                      style={{ borderColor: "var(--color-border-primary)" }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-brand-primary) 60%, transparent)';
-                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-brand-primary) 5%, transparent)';
-                        const iconDiv = e.currentTarget.querySelector('.lesson-icon-bg');
-                        const icon = e.currentTarget.querySelector('.lesson-icon');
-                        if (iconDiv) iconDiv.style.backgroundColor = 'color-mix(in srgb, var(--color-brand-primary) 15%, transparent)';
-                        if (icon) icon.style.color = 'var(--color-brand-primary)';
+                        e.currentTarget.style.borderColor =
+                          "color-mix(in srgb, var(--color-brand-primary) 45%, transparent)";
+                        e.currentTarget.style.backgroundColor =
+                          "color-mix(in srgb, var(--color-brand-primary) 4%, white)";
+                        const iconDiv = e.currentTarget.querySelector(".lesson-icon-bg");
+                        const icon = e.currentTarget.querySelector(".lesson-icon");
+                        if (iconDiv)
+                          iconDiv.style.backgroundColor =
+                            "color-mix(in srgb, var(--color-brand-primary) 15%, transparent)";
+                        if (icon) icon.style.color = "var(--color-brand-primary)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'rgb(229 231 235)';
-                        e.currentTarget.style.backgroundColor = 'white';
-                        const iconDiv = e.currentTarget.querySelector('.lesson-icon-bg');
-                        const icon = e.currentTarget.querySelector('.lesson-icon');
-                        if (iconDiv) iconDiv.style.backgroundColor = 'rgb(243 244 246)';
-                        if (icon) icon.style.color = 'rgb(107 114 128)';
+                        e.currentTarget.style.borderColor = "var(--color-border-primary)";
+                        e.currentTarget.style.backgroundColor = "white";
+                        const iconDiv = e.currentTarget.querySelector(".lesson-icon-bg");
+                        const icon = e.currentTarget.querySelector(".lesson-icon");
+                        if (iconDiv) iconDiv.style.backgroundColor = "rgb(243 244 246)";
+                        if (icon) icon.style.color = "rgb(107 114 128)";
                       }}
                     >
                       <div className="lesson-icon-bg flex-shrink-0 w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center transition-colors">
-                        <FiFileText
-                          className="lesson-icon text-gray-500 transition-colors"
-                          size={18}
-                        />
+                        <FiFileText className="lesson-icon text-gray-500 transition-colors" size={18} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 m-0 max-w-[50%] truncate">
+                        <p className="text-sm font-medium text-gray-900 m-0 break-words">
                           {lesson.title}
                         </p>
                       </div>
                       <span
-                        className={`text-xs font-semibold px-2 py-1 rounded-md border ${getTypeColor(
-                          lesson.type
+                        className={`text-xs font-semibold px-2 py-1 rounded-md border flex-shrink-0 ${getTypeColor(
+                          lesson.type,
                         )}`}
                       >
                         {lesson.type}

@@ -32,16 +32,19 @@ const DIVISIONS_BY_FACULTY = {
 
 const YEARS = ["1", "2", "3", "4"];
 const SEMESTERS = ["first", "second"];
+const LESSON_TYPES = ["Lab", "Lecture"];
 
 const emptyLesson = {
   title: "",
   link: "",
+  type: "Lecture",
   faculty: "",
   division: "",
   subject: "",
   year: "",
   semester: "",
   notes: "",
+  userid:""
 };
 
 const emptyQuiz = {
@@ -53,6 +56,7 @@ const emptyQuiz = {
   semester: "",
   notes: "",
   QuizDate: "",
+  userid:""
 };
 
 const emptyMeeting = {
@@ -64,6 +68,19 @@ const emptyMeeting = {
   semester: "",
   notes: "",
   OnlineMeetingDate: "",
+  userid:""
+};
+
+const emptyAssignment = {
+  title: "",
+  faculty: "",
+  division: "",
+  subject: "",
+  year: "",
+  semester: "",
+  notes: "",
+  deadline: "",
+  userid:""
 };
 
 // Empty optional fields are dropped because empty strings can fail
@@ -87,6 +104,7 @@ const preparePayload = (data) => {
 const FIELD_LABELS = {
   title: "Title",
   link: "Link",
+  type: "Type",
   subject: "Subject",
   faculty: "Faculty",
   division: "Division",
@@ -95,9 +113,10 @@ const FIELD_LABELS = {
   notes: "Notes",
   QuizDate: "Quiz Date",
   OnlineMeetingDate: "Online Meeting Date",
+  deadline: "Deadline",
 };
 
-const LESSON_REQUIRED = ["title", "link", "subject", "faculty", "division", "year", "semester"];
+const LESSON_REQUIRED = ["title", "link", "type", "subject", "faculty", "division", "year", "semester"];
 const QUIZ_REQUIRED = ["title", "faculty", "division", "subject", "year", "semester", "QuizDate"];
 const MEETING_REQUIRED = [
   "title",
@@ -108,6 +127,15 @@ const MEETING_REQUIRED = [
   "semester",
   "OnlineMeetingDate",
 ];
+const ASSIGNMENT_REQUIRED = [
+  "title",
+  "faculty",
+  "division",
+  "subject",
+  "year",
+  "semester",
+  "deadline",
+];
 
 // Returns the labels of the required fields that are still empty.
 const findMissingFields = (data, requiredFields) =>
@@ -116,8 +144,6 @@ const findMissingFields = (data, requiredFields) =>
     .map((field) => FIELD_LABELS[field] ?? field);
 
 // Pull a readable message out of any error shape axios can produce
-// (string body, { message }, { error }, { msg }, { title }, { errors: {...} },
-// or no response at all when the network is down).
 const getErrorMessage = (err, fallback) => {
   const data = err?.response?.data;
 
@@ -140,16 +166,32 @@ const getErrorMessage = (err, fallback) => {
   return fallback;
 };
 
-const UploadLesson = () => {
-  const { user, loading: authLoading } = useAuth();
+const validateTextLimits = (data, ShowSnackBarFn) => {
+  if (data.title !== undefined && data.title !== null) {
+    const titleStr = String(data.title);
+    if (titleStr.length > 100) {
+      ShowSnackBarFn("Title must be at most 100 characters.", "warn");
+      return false;
+    }
+  }
+  if (data.notes !== undefined && data.notes !== null && data.notes !== "") {
+    const notesStr = String(data.notes);
+    if (notesStr.length > 400) {
+      ShowSnackBarFn("Notes must be at most 400 characters.", "warn");
+      return false;
+    }
+  }
+  return true;
+};
+
+const Upload = () => {
+  const { user, loading: authLoading, isGuest } = useAuth();
   const navigate = useNavigate();
   const { ShowSnackBar } = useSnack();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("lessons");
   const lastSnackRef = useRef({ message: "", at: 0 });
 
-  // Only the newest snackbar is visible, so suppress the exact same message
-  // fired twice in a row, but never swallow a different (e.g. success) one.
   const handelSnack = (msg, ty) => {
     const now = Date.now();
     const last = lastSnackRef.current;
@@ -158,13 +200,12 @@ const UploadLesson = () => {
     ShowSnackBar(msg, ty);
   };
 
-  const [lessonData, setLessonData] = useState(emptyLesson);
-  const [quizData, setQuizData] = useState(emptyQuiz);
-  const [meetingData, setMeetingData] = useState(emptyMeeting);
+  const [lessonData, setLessonData] = useState(emptyLesson, emptyLesson.userid = user.id);
+  const [quizData, setQuizData] = useState(emptyQuiz , emptyQuiz.userid = user.id);
+  const [meetingData, setMeetingData] = useState(emptyMeeting , emptyMeeting.userid = user.id);
+  const [assignmentData, setAssignmentData] = useState(emptyAssignment , emptyAssignment.userid = user.id);
 
   useEffect(() => {
-    // Wait for the stored user to be restored, otherwise a refresh
-    // bounces the user to the login page.
     if (authLoading) return;
     if (!user) {
       navigate("/login", { replace: true });
@@ -173,9 +214,14 @@ const UploadLesson = () => {
 
   const handleChange = (setter) => (e) => {
     const { name, value } = e.target;
+    let nextValue = value;
+    if (name === "title" && typeof value === "string") {
+      nextValue = value.slice(0, 100);
+    } else if (name === "notes" && typeof value === "string") {
+      nextValue = value.slice(0, 400);
+    }
     setter((prev) => {
-      const next = { ...prev, [name]: value };
-      // Division options depend on the selected faculty, so reset it.
+      const next = { ...prev, [name]: nextValue };
       if (name === "faculty") {
         next.division = "";
       }
@@ -186,6 +232,7 @@ const UploadLesson = () => {
   const handleLessonChange = handleChange(setLessonData);
   const handleQuizChange = handleChange(setQuizData);
   const handleMeetingChange = handleChange(setMeetingData);
+  const handleAssignmentChange = handleChange(setAssignmentData);
 
   const handleLessonSubmit = async (e) => {
     e.preventDefault();
@@ -194,6 +241,9 @@ const UploadLesson = () => {
     const missing = findMissingFields(lessonData, LESSON_REQUIRED);
     if (missing.length > 0) {
       handelSnack(`Please fill in: ${missing.join(", ")}.`, "warn");
+      return;
+    }
+    if (!validateTextLimits(lessonData, handelSnack)) {
       return;
     }
 
@@ -222,6 +272,9 @@ const UploadLesson = () => {
     const missing = findMissingFields(quizData, QUIZ_REQUIRED);
     if (missing.length > 0) {
       handelSnack(`Please fill in: ${missing.join(", ")}.`, "warn");
+      return;
+    }
+    if (!validateTextLimits(quizData, handelSnack)) {
       return;
     }
 
@@ -262,6 +315,9 @@ const UploadLesson = () => {
       handelSnack(`Please fill in: ${missing.join(", ")}.`, "warn");
       return;
     }
+    if (!validateTextLimits(meetingData, handelSnack)) {
+      return;
+    }
 
     if (meetingData.OnlineMeetingDate) {
       const selectedDate = new Date(meetingData.OnlineMeetingDate);
@@ -293,17 +349,68 @@ const UploadLesson = () => {
     }
   };
 
+  const handleAssignmentSubmit = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    const missing = findMissingFields(assignmentData, ASSIGNMENT_REQUIRED);
+    if (missing.length > 0) {
+      handelSnack(`Please fill in: ${missing.join(", ")}.`, "warn");
+      return;
+    }
+    if (!validateTextLimits(assignmentData, handelSnack)) {
+      return;
+    }
+
+    if (assignmentData.deadline) {
+      const selectedDate = new Date(assignmentData.deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDateOnly = new Date(selectedDate);
+      selectedDateOnly.setHours(0, 0, 0, 0);
+      if (selectedDateOnly < today) {
+        handelSnack("Please select today or a future date and time for the assignment deadline.", "warn");
+        return;
+      }
+    }
+
+    const userId = user?.id || user?._id || user?.userId;
+    if (!userId) {
+      handelSnack("User ID not found. Please re-login and try again.", "error");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = preparePayload(assignmentData);
+      const response = await api.post(`/assignment/${userId}`, payload, {
+        withCredentials: true,
+      });
+      handelSnack(response?.data?.message ?? "Assignment uploaded successfully.", "success");
+      setAssignmentData(emptyAssignment);
+    } catch (err) {
+      handelSnack(
+        getErrorMessage(err, "Failed to upload assignment. Please try again."),
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (authLoading || !user || user.role === "student") {
     return null;
   }
 
   const inputClass =
-    "w-full rounded-xl border border-gray-300 bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20";
+    "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
   const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
   const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
+  const fieldStyle = { borderColor: "var(--color-border-primary)" };
 
   const renderSubjects = (id, value, onChange) => (
-    <select id={id} name="subject" value={value} onChange={onChange} className={selectClass} required>
+    <select id={id} name="subject" value={value} onChange={onChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select subject</option>
       {SUBJECTS.map((option) => (
         <option key={option} value={option}>
@@ -314,7 +421,7 @@ const UploadLesson = () => {
   );
 
   const renderFaculties = (id, value, onChange) => (
-    <select id={id} name="faculty" value={value} onChange={onChange} className={selectClass} required>
+    <select id={id} name="faculty" value={value} onChange={onChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select faculty</option>
       {FACULTIES.map((option) => (
         <option key={option} value={option}>
@@ -333,6 +440,7 @@ const UploadLesson = () => {
         value={value}
         onChange={onChange}
         className={selectClass}
+        style={fieldStyle}
         disabled={options.length === 0}
         required
       >
@@ -349,7 +457,7 @@ const UploadLesson = () => {
   };
 
   const renderYears = (id, value, onChange) => (
-    <select id={id} name="year" value={value} onChange={onChange} className={selectClass} required>
+    <select id={id} name="year" value={value} onChange={onChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select year</option>
       {YEARS.map((option) => (
         <option key={option} value={option}>
@@ -360,7 +468,7 @@ const UploadLesson = () => {
   );
 
   const renderSemesters = (id, value, onChange) => (
-    <select id={id} name="semester" value={value} onChange={onChange} className={selectClass} required>
+    <select id={id} name="semester" value={value} onChange={onChange} className={selectClass} style={fieldStyle} required>
       <option value="">Select semester</option>
       {SEMESTERS.map((option) => (
         <option key={option} value={option}>
@@ -370,45 +478,51 @@ const UploadLesson = () => {
     </select>
   );
 
+  const tabButton = (key, label) => {
+    const active = activeTab === key;
+    return (
+      <button
+        type="button"
+        onClick={() => setActiveTab(key)}
+        className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+          active ? "text-white" : "bg-white border text-gray-900 hover:bg-gray-50"
+        }`}
+        style={
+          active
+            ? { backgroundColor: "var(--color-brand-primary)", color: "#ffffff" }
+            : { borderColor: "var(--color-border-primary)" }
+        }
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-white px-6 sm:px-6 lg:px-6 xl:px-6 2xl:px-6 pb-4 pt-10 box-border">
-      <div className="mb-8">
-        <h1 className="m-0 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 leading-tight max-w-[50%] truncate">
+    <div className="space-y-6">
+      <div className="text-center sm:text-left">
+        <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Upload
         </h1>
-        <p className="m-0 mt-2 text-sm text-gray-500">
-          Add lessons, quizzes/exams, or online meetings to the platform
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
+          Add lessons, quizzes/exams, online meetings, or assignments to the platform
         </p>
       </div>
 
-      <div className="max-w-3xl">
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab("lessons")}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === "lessons" ? "text-white" : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"}`}
-            style={activeTab === "lessons" ? { backgroundColor: 'var(--color-brand-primary)', color: '#ffffff' } : {}}
-          >
-            Lessons
-          </button>
-          <button
-            onClick={() => setActiveTab("quizzes")}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === "quizzes" ? "text-white" : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"}`}
-            style={activeTab === "quizzes" ? { backgroundColor: 'var(--color-brand-primary)', color: '#ffffff' } : {}}
-          >
-            Quizzes/Exams
-          </button>
-          <button
-            onClick={() => setActiveTab("meetings")}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === "meetings" ? "text-white" : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"}`}
-            style={activeTab === "meetings" ? { backgroundColor: 'var(--color-brand-primary)', color: '#ffffff' } : {}}
-          >
-            Online Meetings
-          </button>
+      <div className="max-w-4xl mx-auto w-full">
+        <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
+          {tabButton("lessons", "Lessons")}
+          {tabButton("quizzes", "Quizzes/Exams")}
+          {tabButton("meetings", "Online Meetings")}
+          {tabButton("assignments", "Assignments")}
         </div>
 
         {activeTab === "lessons" && (
           <form onSubmit={handleLessonSubmit} className="space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]">
+            <div
+              className="bg-white border rounded-2xl p-6 sm:p-8"
+              style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+            >
               <div className="space-y-5">
                 <div>
                   <label htmlFor="lesson-title" className={labelClass}>
@@ -418,10 +532,12 @@ const UploadLesson = () => {
                     id="lesson-title"
                     name="title"
                     type="text"
+                    maxLength={100}
                     value={lessonData.title}
                     onChange={handleLessonChange}
                     placeholder="Enter lesson title"
                     className={inputClass}
+                    style={fieldStyle}
                     required
                   />
                 </div>
@@ -438,11 +554,33 @@ const UploadLesson = () => {
                     onChange={handleLessonChange}
                     placeholder="https://example.com/lesson"
                     className={inputClass}
+                    style={fieldStyle}
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label htmlFor="lesson-type" className={labelClass}>
+                      Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="lesson-type"
+                      name="type"
+                      value={lessonData.type}
+                      onChange={handleLessonChange}
+                      className={selectClass}
+                      style={fieldStyle}
+                      required
+                    >
+                      {LESSON_TYPES.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label htmlFor="lesson-subject" className={labelClass}>
                       Subject <span className="text-red-500">*</span>
@@ -493,11 +631,13 @@ const UploadLesson = () => {
                   <textarea
                     id="lesson-notes"
                     name="notes"
+                    maxLength={400}
                     value={lessonData.notes}
                     onChange={handleLessonChange}
                     placeholder="Additional notes about this lesson..."
                     rows={4}
                     className={`${inputClass} resize-none`}
+                    style={fieldStyle}
                   />
                 </div>
               </div>
@@ -505,8 +645,11 @@ const UploadLesson = () => {
               <div className="mt-6">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full sm:w-auto text-white px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
+                  disabled={loading || isGuest}
+                  className={`w-full sm:w-auto text-white px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3 ${isGuest ? "opacity-60" : "disabled:opacity-85"}`}
+                  style={{ backgroundColor: "var(--color-brand-primary)", color: "var(--color-text-white)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary)")}
                 >
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
@@ -524,7 +667,10 @@ const UploadLesson = () => {
 
         {activeTab === "quizzes" && (
           <form onSubmit={handleQuizSubmit} className="space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]">
+            <div
+              className="bg-white border rounded-2xl p-6 sm:p-8"
+              style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+            >
               <div className="space-y-5">
                 <div>
                   <label htmlFor="quiz-title" className={labelClass}>
@@ -534,9 +680,11 @@ const UploadLesson = () => {
                     id="quiz-title"
                     name="title"
                     type="text"
+                    maxLength={100}
                     value={quizData.title}
                     onChange={handleQuizChange}
                     className={inputClass}
+                    style={fieldStyle}
                     required
                   />
                 </div>
@@ -593,6 +741,7 @@ const UploadLesson = () => {
                     value={quizData.QuizDate}
                     onChange={handleQuizChange}
                     className={inputClass}
+                    style={fieldStyle}
                     required
                   />
                 </div>
@@ -604,10 +753,12 @@ const UploadLesson = () => {
                   <textarea
                     id="quiz-notes"
                     name="notes"
+                    maxLength={400}
                     value={quizData.notes}
                     onChange={handleQuizChange}
                     rows={4}
                     className={`${inputClass} resize-none`}
+                    style={fieldStyle}
                   />
                 </div>
               </div>
@@ -615,8 +766,11 @@ const UploadLesson = () => {
               <div className="mt-6">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full sm:w-auto text-white px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
+                  disabled={loading || isGuest}
+                  className={`w-full sm:w-auto text-white px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3 ${isGuest ? "opacity-60" : "disabled:opacity-85"}`}
+                  style={{ backgroundColor: "var(--color-brand-primary)", color: "var(--color-text-white)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary)")}
                 >
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
@@ -634,7 +788,10 @@ const UploadLesson = () => {
 
         {activeTab === "meetings" && (
           <form onSubmit={handleMeetingSubmit} className="space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-[0_8px_24px_rgba(0,0,0,0.04),0_2px_6px_rgba(0,0,0,0.02)]">
+            <div
+              className="bg-white border rounded-2xl p-6 sm:p-8"
+              style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+            >
               <div className="space-y-5">
                 <div>
                   <label htmlFor="meeting-title" className={labelClass}>
@@ -644,9 +801,11 @@ const UploadLesson = () => {
                     id="meeting-title"
                     name="title"
                     type="text"
+                    maxLength={100}
                     value={meetingData.title}
                     onChange={handleMeetingChange}
                     className={inputClass}
+                    style={fieldStyle}
                     required
                   />
                 </div>
@@ -703,6 +862,7 @@ const UploadLesson = () => {
                     value={meetingData.OnlineMeetingDate}
                     onChange={handleMeetingChange}
                     className={inputClass}
+                    style={fieldStyle}
                     required
                   />
                 </div>
@@ -714,10 +874,12 @@ const UploadLesson = () => {
                   <textarea
                     id="meeting-notes"
                     name="notes"
+                    maxLength={400}
                     value={meetingData.notes}
                     onChange={handleMeetingChange}
                     rows={4}
                     className={`${inputClass} resize-none`}
+                    style={fieldStyle}
                   />
                 </div>
               </div>
@@ -725,8 +887,11 @@ const UploadLesson = () => {
               <div className="mt-6">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full sm:w-auto px-8 rounded-xl text-white font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3" style={{ backgroundColor: 'var(--color-brand-primary)', color: 'var(--color-text-white)' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary-hover)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--color-brand-primary)' }
+                  disabled={loading || isGuest}
+                  className="w-full sm:w-auto px-8 rounded-xl text-white font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3"
+                  style={{ backgroundColor: "var(--color-brand-primary)", color: "var(--color-text-white)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary)")}
                 >
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
@@ -741,9 +906,130 @@ const UploadLesson = () => {
             </div>
           </form>
         )}
+
+        {activeTab === "assignments" && (
+          <form onSubmit={handleAssignmentSubmit} className="space-y-6">
+            <div
+              className="bg-white border rounded-2xl p-6 sm:p-8"
+              style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
+            >
+              <div className="space-y-5">
+                <div>
+                  <label htmlFor="assignment-title" className={labelClass}>
+                    Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="assignment-title"
+                    name="title"
+                    type="text"
+                    maxLength={100}
+                    value={assignmentData.title}
+                    onChange={handleAssignmentChange}
+                    className={inputClass}
+                    style={fieldStyle}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label htmlFor="assignment-faculty" className={labelClass}>
+                      Faculty <span className="text-red-500">*</span>
+                    </label>
+                    {renderFaculties("assignment-faculty", assignmentData.faculty, handleAssignmentChange)}
+                  </div>
+                  <div>
+                    <label htmlFor="assignment-division" className={labelClass}>
+                      Division <span className="text-red-500">*</span>
+                    </label>
+                    {renderDivisions(
+                      "assignment-division",
+                      assignmentData.faculty,
+                      assignmentData.division,
+                      handleAssignmentChange,
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label htmlFor="assignment-subject" className={labelClass}>
+                      Subject <span className="text-red-500">*</span>
+                    </label>
+                    {renderSubjects("assignment-subject", assignmentData.subject, handleAssignmentChange)}
+                  </div>
+                  <div>
+                    <label htmlFor="assignment-year" className={labelClass}>
+                      Year <span className="text-red-500">*</span>
+                    </label>
+                    {renderYears("assignment-year", assignmentData.year, handleAssignmentChange)}
+                  </div>
+                  <div>
+                    <label htmlFor="assignment-semester" className={labelClass}>
+                      Semester <span className="text-red-500">*</span>
+                    </label>
+                    {renderSemesters("assignment-semester", assignmentData.semester, handleAssignmentChange)}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="assignment-date" className={labelClass}>
+                    Deadline (date and time) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="assignment-date"
+                    name="deadline"
+                    type="datetime-local"
+                    value={assignmentData.deadline}
+                    onChange={handleAssignmentChange}
+                    className={inputClass}
+                    style={fieldStyle}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="assignment-notes" className={labelClass}>
+                    Notes
+                  </label>
+                  <textarea
+                    id="assignment-notes"
+                    name="notes"
+                    maxLength={400}
+                    value={assignmentData.notes}
+                    onChange={handleAssignmentChange}
+                    rows={4}
+                    className={`${inputClass} resize-none`}
+                    style={fieldStyle}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  type="submit"
+                  disabled={loading || isGuest}
+                  className="w-full sm:w-auto px-8 rounded-xl text-white font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed disabled:opacity-85 active:scale-[0.99] py-3"
+                  style={{ backgroundColor: "var(--color-brand-primary)", color: "var(--color-text-white)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary)")}
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                      Uploading...
+                    </span>
+                  ) : (
+                    "Upload Assignment"
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
 };
 
-export default UploadLesson;
+export default Upload;
