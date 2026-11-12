@@ -17,62 +17,52 @@ namespace backend.Controllers
     [Authorize]
     public class OnlineMeetingController : ControllerBase
     {
-        private readonly IOnlineMeetRepo _om;
-        private readonly UserManager<User> _ur;
+        private readonly IOnlineMeetRepo _repo;
+        private readonly UserManager<User> _manager;
         private readonly OnlineMeetService _service;
 
         public OnlineMeetingController(IOnlineMeetRepo om,UserManager<User> ur , OnlineMeetService ser)
         {
             _service = ser;
-            _ur = ur;
-            _om = om;
+            _manager = ur;
+            _repo = om;
         }
 
         [HttpPost]
-        public async Task<IActionResult> uploadItem([FromBody] OnlineMeetUploadDTO item)
+        public async Task<IActionResult> UploadOnlineMeeting([FromBody] OnlineMeetUploadDTO meeting)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            OnlineMeetings newLesson = new OnlineMeetings
-            {
-              Faculty = item.Faculty,
-              Division = item.Division,
-              Notes = item.Notes,
-              semester = item.semester,
-              Subject = item.Subject,
-              Title = item.Title,
-              Year = item.Year
-              ,OnlineMeetingDate = item.OnlineMeetingDate 
-            };
+            var res = await _service.UploadOnlineMeeting(meeting);
 
-            await _om.Create(newLesson);
+            if(!res.flag) return BadRequest(res.msg);
 
             return Created();
         }
 
         [HttpDelete ("{id}")]
-        public async Task<IActionResult> deleteItem([FromRoute] int id)
+        public async Task<IActionResult> DeleteOnlineMeeting([FromRoute] int id)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            var item = await _om.GetById(id);
+            var item = await _repo.GetById(id);
 
             if(item != null)
             {
-                await _om.Delete(item);
+                await _repo.Delete(item);
                 return Ok("Deleted Successfully !");
             }
 
-            return NotFound("There Is No Item With Such Id");
+            return NotFound("There Is No Meeting With Such Id");
            
         }        
 
         [HttpPut ("{id}")]
-        public async Task<IActionResult> editOnlineMeeting([FromRoute] int id , [FromBody] OnlineMeetEditDTO newMeet)
+        public async Task<IActionResult> EditOnlineMeeting([FromRoute] int id , [FromBody] OnlineMeetEditDTO newMeet)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
             
-            var flag = await _service.editOnlineMeet(id , newMeet);
+            var flag = await _service.EditOnlineMeeting(id , newMeet);
 
             if(flag)
             {
@@ -80,58 +70,6 @@ namespace backend.Controllers
             }
             return NotFound("There Is No Item With Such Id");
         } 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> getAllMeetings([FromRoute] string id , [FromBody] bool IsCard = false)
-        {
-            if(!ModelState.IsValid) return BadRequest(ModelState);
-
-            var user = await _ur.FindByIdAsync(id);
-
-            if(user == null) return NotFound("No user with such id");
-
-            UploadSort sort = new UploadSort()
-            {
-                Division = user.Division,
-                Faculty = user.Faculty,
-                Year = user.Year                
-            };
-
-            var meets  = await _om.GetAllMeetsWithStudentSort(sort);
-
-            if(!meets.Any() || meets.Count == 0) return NotFound("No Meetings at the time .");
-
-            var veiwmeets = meets.Select(x => new
-            {
-               division = x.Division,
-               faculty = x.Faculty,
-               notes = x.Notes,
-               id = x.Id,
-               date = x.OnlineMeetingDate,
-               semester = x.semester,
-               subject = x.Subject,
-               title = x.Title,
-               year = x.Year  
-            }).OrderBy(x => x.date).AsQueryable();
-
-            if (IsCard)
-            {
-                veiwmeets = veiwmeets.Take(6);
-            }
-
-            veiwmeets.ToList();
-
-            return Ok(veiwmeets);
-        }
-        [HttpGet("single/{meet_id}")]
-        public async Task<IActionResult> getSingleOnlineMeetingData([FromRoute] int meet_id , [FromQuery] string user_id)
-        {
-            if(!ModelState.IsValid) return BadRequest(ModelState);
-
-            var data = await _service.handelSingleOnlineMeetingFetch(user_id , meet_id);
-
-            if(data == null) return NotFound("No meeting with such Id");
-
-            return Ok(data);
-        }
+       
     }
 }

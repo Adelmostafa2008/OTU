@@ -15,6 +15,12 @@ namespace backend.Repos
         {
         }
 
+        public async Task<User> FindByUniversityCode(string code)
+        {
+            var user = await _db.users.FirstOrDefaultAsync(x => x.UniversityCode == code);
+            return user;
+        }
+
         public async Task<User> GetUserByRefreshToken(string ttt)
         {
             var user = await _db.users.FirstOrDefaultAsync(x => x.RefreshToken == ttt);

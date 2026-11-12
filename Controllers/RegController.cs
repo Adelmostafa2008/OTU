@@ -17,17 +17,17 @@ namespace backend.Controllers
     [Route("api/[controller]")]
     public class RegController : ControllerBase
     {
-        private readonly UserManager<User> _user;
+        private readonly UserManager<User> _user_manager;
         private readonly ITokenGen _token;
         private readonly SignInManager<User> _signInManager;
         private readonly IConfiguration _config;
         private readonly IUserRepo _ur;
-        public RegController(UserManager<User> user , IUserRepo ur,IConfiguration config,  ITokenGen token, SignInManager<User> sign)
+        public RegController(UserManager<User> user_manager , IUserRepo ur,IConfiguration config,  ITokenGen token, SignInManager<User> sign)
         {
             _config = config;
             _ur = ur;
             _token = token;
-            _user = user;
+            _user_manager = user_manager;
             _signInManager = sign;
             
         }
@@ -39,11 +39,23 @@ namespace backend.Controllers
             try
             {
                 if (!ModelState.IsValid)
-                    return BadRequest("One or more validations didnot get specified");
-                var userEmail = await _user.FindByEmailAsync(user.email);
+                {    
+                   return BadRequest("One or more validations didnot get specified");
+                }
+            
+                var userEmail = await _user_manager.FindByEmailAsync(user.email);
                 if (userEmail != null)
                 {
                     return BadRequest("Email Address Already Exists");
+                }
+                if(user.code != null)
+                {
+                    
+                var userCode = await _ur.FindByUniversityCode(user.code);
+                if(userCode != null)
+                {
+                    return BadRequest("University Code Already Exists.");
+                }
                 }
                 var newUser = new User
                 {   
@@ -57,16 +69,16 @@ namespace backend.Controllers
                    
                 };
 
-                var createdUser = await _user.CreateAsync(newUser, user.password);
+                var createdUser = await _user_manager.CreateAsync(newUser, user.password);
                 
                 if (createdUser.Succeeded)
                 {
-                    var Role = await _user.AddToRoleAsync(newUser, "student");
+                    var Role = await _user_manager.AddToRoleAsync(newUser, user.role);
                     if (Role.Succeeded)
                     {
                         
                         return Ok(
-                            "new student added !"
+                            $"New {user.role} added !"
                         );
                     }
                     else
@@ -91,13 +103,13 @@ namespace backend.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var user = await _user.FindByEmailAsync(login.email);
+            var user = await _user_manager.FindByEmailAsync(login.email);
 
             if (user == null) return BadRequest("Invalid Email or Password.");
 
             var result = await _signInManager.CheckPasswordSignInAsync(user, login.password, false);
 
-            if (!result.Succeeded) return BadRequest("Invalid Username or Password.");
+            if (!result.Succeeded) return BadRequest("Invalid Email or Password.");
 
 
             var token = await TokenGeneration(user);
@@ -181,7 +193,7 @@ namespace backend.Controllers
 
         private async Task<object> LoginResponseAsync(User user , string token)
         {
-            var roles = await _user.GetRolesAsync(user);
+            var roles = await _user_manager.GetRolesAsync(user);
             return new
                             {
                                 Id = user.Id,

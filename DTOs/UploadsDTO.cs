@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,12 +14,16 @@ namespace backend.DTOs
         public string Subject {get;set;}
         public int Year {get;set;}
         public string semester {get;set;}
+        [MaxLength(405)]
         public string ? Notes {get;set;}
+        [MaxLength(105)]
         public string Title {get;set;}
+        public string ? userid{get;set;}
     }
     public class UploadDTO : GeneralUploadDTO
     {
         public string Link {get;set;}
+        public string Type {get;set;}
         
     }
     public class EditUpDTO : UploadDTO {}
@@ -37,6 +43,12 @@ namespace backend.DTOs
     }
 
     public class OnlineMeetEditDTO : OnlineMeetUploadDTO {}
+
+    public class AssignmentUpload : GeneralUploadDTO
+    {
+        public DateTime deadline {get;set;}
+    }
+    public class AssignmentEdit : AssignmentUpload{}
 
     public class UploadSearch
     {

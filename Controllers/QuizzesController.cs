@@ -30,29 +30,19 @@ namespace backend.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> uploadItem([FromBody] QuizzUploadDTO item)
+        public async Task<IActionResult> UploadQuiz([FromBody] QuizzUploadDTO item)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            Quizzes newLesson = new Quizzes
-            {
-              Faculty = item.Faculty,
-              Division = item.Division,
-              Notes = item.Notes,
-              semester = item.semester,
-              Subject = item.Subject,
-              Title = item.Title,
-              Year = item.Year
-              ,QuizDate = item.QuizDate  
-            };
+            var res = await _service.UploadQuiz(item);
 
-            await _qr.Create(newLesson);
+            if(!res.flag) return BadRequest(res.msg);
 
             return Created();
         }
 
         [HttpDelete ("{id}")]
-        public async Task<IActionResult> deleteItem([FromRoute] int id)
+        public async Task<IActionResult> DeleteQuiz([FromRoute] int id)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
@@ -69,11 +59,11 @@ namespace backend.Controllers
         }         
 
         [HttpPut ("{id}")]
-        public async Task<IActionResult> editQuiz([FromRoute] int id , [FromBody] QuizzEditDTO newquiz)
+        public async Task<IActionResult> EditQuiz([FromRoute] int id , [FromBody] QuizzEditDTO newquiz)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            var flag = await _service.editQuiz(id , newquiz);
+            var flag = await _service.EditQuiz(id , newquiz);
 
             if(flag)
             {                
@@ -81,57 +71,6 @@ namespace backend.Controllers
             }
             return NotFound("There Is No Item With Such Id");
         }
-        [HttpGet("{id}")]
-        public async Task<IActionResult> getAllQuizzes([FromRoute] string id , [FromBody] bool IsCard = false)
-        {
-            var user = await _ur.FindByIdAsync(id);
-
-            if(user == null) return NotFound("No user with such id");
-
-            UploadSort sort = new UploadSort()
-            {
-                Division = user.Division,
-                Faculty = user.Faculty,
-                Year = user.Year                
-            };
-
-            var quizzes = await _qr.GetAllQuizzesWithStudentSort(sort);
-
-            if(!quizzes.Any() || quizzes.Count == 0) return NotFound("No quizzes at the time .");
-
-            var veiwquizzes = quizzes.Select(x => new
-            {
-               division = x.Division,
-               faculty = x.Faculty,
-               notes = x.Notes,
-               id = x.Id,
-               date = x.QuizDate,
-               semester = x.semester,
-               subject = x.Subject,
-               title = x.Title,
-               year = x.Year  
-            }).OrderBy(x => x.date).AsQueryable();
-
-            if(IsCard)
-            {
-                veiwquizzes = veiwquizzes.Take(6);
-            }
-            
-            veiwquizzes.ToList();
-
-            return Ok(veiwquizzes);
-        }
-        [HttpGet("single/{quiz_id}")]
-        public async Task<IActionResult> getSingleQuizData([FromRoute] int quiz_id , [FromQuery] string user_id)
-        {
-            if(!ModelState.IsValid) return BadRequest(ModelState);
-
-
-            var data = await _service.handelSingleQuizFetch(user_id , quiz_id);
-
-            if(data == null) return NotFound("No meeting with such Id");
-
-            return Ok(data);
-        }
+        
     }
 }

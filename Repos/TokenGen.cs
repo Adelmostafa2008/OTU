@@ -26,7 +26,8 @@ namespace backend.Repos
             {
                 new Claim(JwtRegisteredClaimNames.GivenName , user.UserName!),
                 new Claim(JwtRegisteredClaimNames.Email,user.Email!),
-                new Claim(JwtRegisteredClaimNames.Sid , user.UniversityCode)
+                new Claim(JwtRegisteredClaimNames.Sid , user.Id)
+                //role will be added here
             };
 
             var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);

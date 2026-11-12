@@ -50,22 +50,29 @@ namespace backend.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "e4cb2f6a-a1f4-4d2b-882c-34537c7663ad",
-                            ConcurrencyStamp = "695f8cf2-e643-401c-b827-cc1bf56af648",
-                            Name = "student",
-                            NormalizedName = "STUDENT"
-                        },
-                        new
-                        {
-                            Id = "6961510d-84ad-4439-af3a-6ea9b6b06a53",
-                            ConcurrencyStamp = "fc7194d0-f964-409b-9d7b-301a1bf3043b",
+                            Id = "021b4019-88ed-485d-aefd-fa4a40a00c59",
+                            ConcurrencyStamp = "17f4903e-6495-4380-9da5-f34704b33965",
                             Name = "admin",
                             NormalizedName = "ADMIN"
                         },
                         new
                         {
-                            Id = "d8782df4-0684-474e-9268-c4ba5770dd5e",
-                            ConcurrencyStamp = "7ddac967-db6a-4a27-a4bf-8be778f830f5",
+                            Id = "04d72bb8-d372-4707-8ad7-ac3594e839eb",
+                            ConcurrencyStamp = "cf2d63f0-154d-4db5-9e13-0a6b076cb0a1",
+                            Name = "student",
+                            NormalizedName = "STUDENT"
+                        },
+                        new
+                        {
+                            Id = "a2e734a7-e623-436a-9ba5-07bbf03207e4",
+                            ConcurrencyStamp = "6c4d6e20-986f-408f-b253-cf87270cc109",
+                            Name = "guest",
+                            NormalizedName = "GUEST"
+                        },
+                        new
+                        {
+                            Id = "fbf09d88-dc4f-40f2-ba17-41bf8992391b",
+                            ConcurrencyStamp = "1db14024-4ff1-48ac-94f1-fec0cee64a73",
                             Name = "instructor",
                             NormalizedName = "INSTRUCTOR"
                         });
@@ -177,6 +184,57 @@ namespace backend.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("backend.Models.Assignments", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("Deadline")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Division")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Faculty")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(405)
+                        .HasColumnType("varchar(405)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(105)
+                        .HasColumnType("varchar(105)");
+
+                    b.Property<string>("UploaderId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("UploaderName")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.Property<string>("semester")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UploaderId");
+
+                    b.ToTable("assignments");
+                });
+
             modelBuilder.Entity("backend.Models.Lessons", b =>
                 {
                     b.Property<int>("Id")
@@ -198,7 +256,8 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("longtext");
+                        .HasMaxLength(405)
+                        .HasColumnType("varchar(405)");
 
                     b.Property<string>("Subject")
                         .IsRequired()
@@ -206,10 +265,21 @@ namespace backend.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
+                        .HasMaxLength(105)
+                        .HasColumnType("varchar(105)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<DateTime>("UploadDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UploaderId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("UploaderName")
+                        .HasColumnType("longtext");
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
@@ -218,6 +288,8 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UploaderId");
 
                     b.ToTable("lessons");
                 });
@@ -239,7 +311,8 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("longtext");
+                        .HasMaxLength(405)
+                        .HasColumnType("varchar(405)");
 
                     b.Property<DateTime>("OnlineMeetingDate")
                         .HasColumnType("datetime(6)");
@@ -250,6 +323,13 @@ namespace backend.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
+                        .HasMaxLength(105)
+                        .HasColumnType("varchar(105)");
+
+                    b.Property<string>("UploaderId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("UploaderName")
                         .HasColumnType("longtext");
 
                     b.Property<int>("Year")
@@ -259,6 +339,8 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UploaderId");
 
                     b.ToTable("onlineMeetings");
                 });
@@ -280,7 +362,8 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("longtext");
+                        .HasMaxLength(405)
+                        .HasColumnType("varchar(405)");
 
                     b.Property<DateTime>("QuizDate")
                         .HasColumnType("datetime(6)");
@@ -291,6 +374,13 @@ namespace backend.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
+                        .HasMaxLength(105)
+                        .HasColumnType("varchar(105)");
+
+                    b.Property<string>("UploaderId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("UploaderName")
                         .HasColumnType("longtext");
 
                     b.Property<int>("Year")
@@ -300,6 +390,8 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UploaderId");
 
                     b.ToTable("quizzes");
                 });
@@ -317,7 +409,6 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Division")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("Email")
@@ -328,11 +419,9 @@ namespace backend.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Faculty")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("Group")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<bool>("LockoutEnabled")
@@ -371,14 +460,13 @@ namespace backend.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<string>("UniversityCode")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
 
-                    b.Property<int>("Year")
+                    b.Property<int?>("Year")
                         .HasColumnType("int");
 
                     b.Property<string>("givenName")
@@ -446,6 +534,57 @@ namespace backend.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("backend.Models.Assignments", b =>
+                {
+                    b.HasOne("backend.Models.User", "Uploader")
+                        .WithMany("assignments")
+                        .HasForeignKey("UploaderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("backend.Models.Lessons", b =>
+                {
+                    b.HasOne("backend.Models.User", "Uploader")
+                        .WithMany("lessons")
+                        .HasForeignKey("UploaderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("backend.Models.OnlineMeetings", b =>
+                {
+                    b.HasOne("backend.Models.User", "Uploader")
+                        .WithMany("meetings")
+                        .HasForeignKey("UploaderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("backend.Models.Quizzes", b =>
+                {
+                    b.HasOne("backend.Models.User", "Uploader")
+                        .WithMany("quizzes")
+                        .HasForeignKey("UploaderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("backend.Models.User", b =>
+                {
+                    b.Navigation("assignments");
+
+                    b.Navigation("lessons");
+
+                    b.Navigation("meetings");
+
+                    b.Navigation("quizzes");
                 });
 #pragma warning restore 612, 618
         }

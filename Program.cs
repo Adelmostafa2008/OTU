@@ -36,6 +36,8 @@ builder.Services.AddScoped<IOnlineMeetRepo , OnlineMeetRepo>();
 builder.Services.AddScoped<QuizService>();
 builder.Services.AddScoped<OnlineMeetService>();
 builder.Services.AddScoped<StudentService>();
+builder.Services.AddScoped<IAssignmentRepo , AssignmentRepo>();
+builder.Services.AddScoped<AssignmentService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();

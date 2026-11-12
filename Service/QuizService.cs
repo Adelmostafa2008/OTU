@@ -13,15 +13,15 @@ namespace backend.Service
     public class QuizService
     {
         private readonly IQuizzesRepo _qr;
-        private readonly UserManager<User> _ur;
+        private readonly UserManager<User> _manager;
 
         public QuizService(IQuizzesRepo qr , UserManager<User> ur)
         {
-            _ur = ur;
+            _manager = ur;
             _qr = qr;
         }
 
-        public async Task<bool> editQuiz(int id ,QuizzEditDTO newquiz)
+        public async Task<bool> EditQuiz(int id ,QuizzEditDTO newquiz)
         {
             var quiz = await _qr.GetById(id);
 
@@ -36,9 +36,9 @@ namespace backend.Service
             return true;
         }
 
-        public async Task<object> handelSingleQuizFetch(string user_id , int quiz_id)
+        public async Task<object> HandelSingleQuizFetch(string user_id , int quiz_id)
         {
-            var user = await _ur.FindByIdAsync(user_id);
+            var user = await _manager.FindByIdAsync(user_id);
 
             if(user == null) return null;
 
@@ -63,8 +63,24 @@ namespace backend.Service
                semester = quiz.semester,
                subject = quiz.Subject,
                title = quiz.Title,
-               year = quiz.Year  
+               year = quiz.Year  ,
+               uploadername = quiz.UploaderName
             };
+        }
+
+        public async Task<result> UploadQuiz(QuizzUploadDTO quiz)
+        {
+            var user = await _manager.FindByIdAsync(quiz.userid);
+
+            if(user == null) return new result{flag = false , msg = "Invalid Uploader ID."};
+
+            QuizMapper mapper = new QuizMapper{};
+
+            var new_quiz = mapper.UploadQuizMapper(quiz , user);
+
+            await _qr.Create(new_quiz);
+
+            return new result{flag = true , msg = "Quiz Uploaded Successfully."};
         }
     }
 }

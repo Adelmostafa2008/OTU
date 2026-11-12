@@ -12,18 +12,18 @@ namespace backend.Service
 {
     public class OnlineMeetService
     {
-        private readonly IOnlineMeetRepo _omr;
-        private readonly UserManager<User> _ur;
+        private readonly IOnlineMeetRepo _repo;
+        private readonly UserManager<User> _manager;
 
         public OnlineMeetService(IOnlineMeetRepo omr , UserManager<User> ur)
         {
-            _ur = ur;
-            _omr = omr;
+            _manager = ur;
+            _repo = omr;
         }
 
-        public async Task<bool> editOnlineMeet(int id , OnlineMeetEditDTO newmeet)
+        public async Task<bool> EditOnlineMeeting(int id , OnlineMeetEditDTO newmeet)
         {
-            var old_meet = await _omr.GetById(id);
+            var old_meet = await _repo.GetById(id);
 
             if(old_meet == null) return false;
 
@@ -31,14 +31,14 @@ namespace backend.Service
 
             meetMapper.editOnlineMeetingMapper(old_meet , newmeet);
 
-            await _omr.Save();
+            await _repo.Save();
 
             return true;
         }
 
-        public async Task<object> handelSingleOnlineMeetingFetch(string user_id , int meet_id)
+        public async Task<object> HandelSingleOnlineMeetingFetch(string user_id , int meet_id)
         {
-            var user = await _ur.FindByIdAsync(user_id);
+            var user = await _manager.FindByIdAsync(user_id);
 
             if(user == null) return null;
 
@@ -49,7 +49,7 @@ namespace backend.Service
                 Year = user.Year                
             };
 
-            var meet  = await _omr.GetSingleOnlineMeeting(sort,meet_id);
+            var meet  = await _repo.GetSingleOnlineMeeting(sort,meet_id);
 
             if(meet == null) return null;
 
@@ -63,8 +63,24 @@ namespace backend.Service
                semester = meet.semester,
                subject = meet.Subject,
                title = meet.Title,
-               year = meet.Year  
+               year = meet.Year  ,
+               uploadername = meet.UploaderName
             };
+        }
+
+        public async Task<result> UploadOnlineMeeting(OnlineMeetUploadDTO meet)
+        {
+            var user = await _manager.FindByIdAsync(meet.userid);
+
+            if(user == null) return new result{flag = false , msg = "Invalid User ID."};
+
+            OnlineMeetingMapper mapper = new OnlineMeetingMapper{};
+
+            var new_meet = mapper.UploadOnlineMeetingMapper(meet , user);
+
+            await _repo.Create(new_meet);
+
+            return new result{flag = true , msg = "Online Meeting Uploaded Successfully."};
         }
     }
 }

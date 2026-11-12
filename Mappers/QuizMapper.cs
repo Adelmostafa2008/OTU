@@ -27,7 +27,7 @@ namespace backend.Mappers
             {
                 quiz.Subject = newQuiz.Subject;
             }
-            if(newQuiz.Year != null && newQuiz.Year != quiz.Year)
+            if(newQuiz.Year != quiz.Year)
             {
                 quiz.Year = newQuiz.Year;
             }
@@ -45,6 +45,27 @@ namespace backend.Mappers
             }
 
             return quiz;    
+        }
+
+        public Quizzes UploadQuizMapper(QuizzUploadDTO item , User user)
+        {
+            Quizzes newQuiz = new Quizzes
+            {
+              Faculty = item.Faculty,
+              Division = item.Division,
+              Notes = item.Notes,
+              semester = item.semester,
+              Subject = item.Subject,
+              Title = item.Title,
+              Year = item.Year,
+              QuizDate = item.QuizDate,  
+              Uploader = user,
+              UploaderId = user.Id,
+              UploaderName = user.givenName
+            };
+
+            return newQuiz;
+
         }
     }
 }

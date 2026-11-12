@@ -9,7 +9,7 @@ namespace backend.Mappers
 {
     public class OnlineMeetingMapper
     {
-        public OnlineMeetings editOnlineMeetingMapper(OnlineMeetings meet , OnlineMeetEditDTO newMeet)
+        public void editOnlineMeetingMapper(OnlineMeetings meet , OnlineMeetEditDTO newMeet)
         {
             if(!string.IsNullOrEmpty(newMeet.Title) && newMeet.Title != meet.Title)
             {
@@ -27,7 +27,7 @@ namespace backend.Mappers
             {
                 meet.Subject = newMeet.Subject;
             }
-            if(newMeet.Year != null && newMeet.Year != meet.Year)
+            if(newMeet.Year != meet.Year)
             {
                 meet.Year = newMeet.Year;
             }
@@ -43,9 +43,26 @@ namespace backend.Mappers
             {
                 meet.OnlineMeetingDate = newMeet.OnlineMeetingDate;
             }
+        }
 
+        public OnlineMeetings UploadOnlineMeetingMapper(OnlineMeetUploadDTO meeting , User user)
+        {
+            OnlineMeetings newMeeting = new OnlineMeetings
+            {
+              Faculty = meeting.Faculty,
+              Division = meeting.Division,
+              Notes = meeting.Notes,
+              semester = meeting.semester,
+              Subject = meeting.Subject,
+              Title = meeting.Title,
+              Year = meeting.Year,
+              OnlineMeetingDate = meeting.OnlineMeetingDate,
+              Uploader = user,
+              UploaderId = user.Id,
+              UploaderName = user.givenName
+            };
 
-            return meet;
+            return newMeeting;
         }
     }
 }

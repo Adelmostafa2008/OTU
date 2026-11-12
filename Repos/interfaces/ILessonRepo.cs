@@ -10,5 +10,6 @@ namespace backend.Repos.interfaces
     public interface ILessonRepo : IGenericRepo<Lessons>
     {
         Task<IList<Lessons>> GetAllUploads(UploadSearch search , UploadSort sort , int pageNum);
+        Task<IList<Lessons>> GetNewestLessonsUploaded(UploadSort sort);
     }
 }

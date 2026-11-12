@@ -18,16 +18,40 @@ namespace backend.Repos
 
         public async Task<IList<OnlineMeetings>> GetAllMeetsWithStudentSort(UploadSort sort)
         {
-            var mts = await _db.onlineMeetings.Where(x => x.Division == sort.Division && x.Faculty == sort.Faculty && x.Year == sort.Year).ToListAsync();
+            var mts = _db.onlineMeetings.AsQueryable();
 
-            return mts;
+            if (!string.IsNullOrEmpty(sort.Division))
+            {
+                mts = mts.Where(x => x.Division == sort.Division);
+            }
+            if (!string.IsNullOrEmpty(sort.Faculty))
+            {
+                mts = mts.Where(x => x.Faculty == sort.Faculty);
+            }if (sort.Year != null)
+            {
+                mts = mts.Where(x => x.Year == sort.Year);
+            }
+
+            return await mts.ToListAsync();
         }
 
         public async Task<OnlineMeetings> GetSingleOnlineMeeting(UploadSort sort , int meet_id)
         {
-            var mt = await _db.onlineMeetings.Where(x => x.Division == sort.Division && x.Faculty == sort.Faculty && x.Year == sort.Year).FirstOrDefaultAsync(x => x.Id == meet_id);
+            var mt = _db.onlineMeetings.AsQueryable();
 
-            return mt;
+            if (!string.IsNullOrEmpty(sort.Division))
+            {
+                mt = mt.Where(x => x.Division == sort.Division);
+            }
+            if (!string.IsNullOrEmpty(sort.Faculty))
+            {
+                mt = mt.Where(x => x.Faculty == sort.Faculty);
+            }if (sort.Year != null)
+            {
+                mt = mt.Where(x => x.Year == sort.Year);
+            }
+
+            return await mt.FirstOrDefaultAsync(x => x.Id == meet_id);
         }
     }
 }

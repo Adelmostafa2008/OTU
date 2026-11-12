@@ -9,5 +9,6 @@ namespace backend.Repos.interfaces
     public interface IUserRepo : IGenericRepo<User>
     {
         Task<User> GetUserByRefreshToken(string RefreshToken);
+        Task<User> FindByUniversityCode(string code);
     }
 }
