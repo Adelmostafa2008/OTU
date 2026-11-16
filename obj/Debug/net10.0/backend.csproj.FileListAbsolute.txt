@@ -130,3 +130,5 @@ E:\Adel\Pro project 2\OTU.hub\backend\bin\Debug\net10.0\Microsoft.IdentityModel.
 E:\Adel\Pro project 2\OTU.hub\backend\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
 E:\Adel\Pro project 2\OTU.hub\backend\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
 E:\Adel\Pro project 2\OTU.hub\backend\obj\Debug\net10.0\backend.sourcelink.json
+E:\Adel\Pro project 2\OTU.hub\backend\bin\Debug\net10.0\CloudinaryDotNet.dll
+E:\Adel\Pro project 2\OTU.hub\backend\bin\Debug\net10.0\Newtonsoft.Json.dll

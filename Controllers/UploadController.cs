@@ -16,13 +16,15 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    //[Authorize]
     public class UploadController : ControllerBase
     {
         private readonly ILessonRepo _lr;
+        private readonly FileUploadService _service;
         private readonly UserManager<User> _manager;
-        public UploadController(ILessonRepo lr , UserManager<User> manager)
+        public UploadController(ILessonRepo lr , FileUploadService service,UserManager<User> manager)
         {
+            _service = service;
             _manager = manager;
             _lr = lr;
         }
@@ -86,5 +88,23 @@ namespace backend.Controllers
             }
             return NotFound("There Is No Item With Such Id");
         }
+
+        [HttpPost("test")]
+    public async Task<IActionResult> UploadDocument(IFormFile file)
+    {
+        
+        // 1. Validate that a file was actually sent
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file was uploaded.");
+        }
+
+        // 2. Upload to Cloudinary and get the URL back
+        var result = await _service.UploadFile(file);
+
+        if(!result.flag) return BadRequest(result.msg);
+
+        return Ok(new { Url = result.msg });
+    }
     }
 }
