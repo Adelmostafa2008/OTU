@@ -245,7 +245,7 @@ const HomePage = () => {
           }}
         >
           <p className="m-0 text-sm sm:text-base font-medium text-amber-600">
-            As a guest user you will be authorized to read and preveiw pages only and not preform any actions
+            As a guest user you will be authorized to read and preveiw pages only and you can't perform any actions
           </p>
         </div>
       )}
