@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "E:\\Adel\\Pro project 2\\OTU.hub\\backend\\backend.csproj": {}
+    "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj": {}
   },
   "projects": {
-    "E:\\Adel\\Pro project 2\\OTU.hub\\backend\\backend.csproj": {
+    "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\Adel\\Pro project 2\\OTU.hub\\backend\\backend.csproj",
+        "projectUniqueName": "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj",
         "projectName": "backend",
-        "projectPath": "E:\\Adel\\Pro project 2\\OTU.hub\\backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\KimoStore\\.nuget\\packages\\",
-        "outputPath": "E:\\Adel\\Pro project 2\\OTU.hub\\backend\\obj\\",
+        "projectPath": "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj",
+        "packagesPath": "C:\\Users\\Work station\\.nuget\\packages\\",
+        "outputPath": "E:\\Work\\pro project\\OTU.hub\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\KimoStore\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Work station\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -94,7 +94,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.401/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.404/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
