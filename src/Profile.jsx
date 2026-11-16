@@ -12,7 +12,7 @@ const ProfilePage = () => {
   const [isEditingPhone, setIsEditingPhone] = useState(!user?.phone);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  useEffect(() => { 
     if (user) {
       setPhone(user.phone || "");
       setIsEditingPhone(!user.phone);
