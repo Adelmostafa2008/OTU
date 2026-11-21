@@ -92,7 +92,7 @@ namespace backend.Mappers
             return result;
         }
 
-        public Assignment_result GetAssignmentMapper(Assignments assignment)
+        public Assignment_result GetAssignmentMapper(Assignments assignment , string userid)
         {
             return new Assignment_result
             {
@@ -107,7 +107,8 @@ namespace backend.Mappers
                 uploadername = assignment.UploaderName,
                 flag = true,
                 msg = "",
-                id = assignment.Id
+                id = assignment.Id,
+                iscreator = userid != "admin" ? userid == assignment.Uploader!.Id : true
             };
         }
     }

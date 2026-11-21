@@ -71,7 +71,7 @@ namespace backend.Repos
                 lessons = lessons.Where(x => x.Year == sort.Year);
             }
 
-            return await lessons.Take(6).ToListAsync();
+            return await lessons.OrderByDescending(x => x.UploadDate).Take(6).ToListAsync();
         }
     }
 }

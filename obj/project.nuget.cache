@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "eokVFZCeJbY=",
+  "dgSpecHash": "CRzhsa59e6s=",
   "success": true,
   "projectFilePath": "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\Work station\\.nuget\\packages\\awssdk.core\\4.1.1\\awssdk.core.4.1.1.nupkg.sha512",
+    "C:\\Users\\Work station\\.nuget\\packages\\awssdk.extensions.numerics\\4.1.0\\awssdk.extensions.numerics.4.1.0.nupkg.sha512",
+    "C:\\Users\\Work station\\.nuget\\packages\\awssdk.s3\\4.1.0.1\\awssdk.s3.4.1.0.1.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\cloudinarydotnet\\1.29.3\\cloudinarydotnet.1.29.3.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\10.0.12\\microsoft.aspnetcore.authentication.jwtbearer.10.0.12.nupkg.sha512",
@@ -34,7 +37,7 @@
     "C:\\Users\\Work station\\.nuget\\packages\\microsoft.identitymodel.tokens\\8.19.2\\microsoft.identitymodel.tokens.8.19.2.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\microsoft.openapi\\2.12.0\\microsoft.openapi.2.12.0.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\mono.texttemplating\\3.0.0\\mono.texttemplating.3.0.0.nupkg.sha512",
-    "C:\\Users\\Work station\\.nuget\\packages\\mysqlconnector\\2.4.0\\mysqlconnector.2.4.0.nupkg.sha512",
+    "C:\\Users\\Work station\\.nuget\\packages\\mysqlconnector\\3.0.0\\mysqlconnector.3.0.0.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\pomelo.entityframeworkcore.mysql\\9.0.0\\pomelo.entityframeworkcore.mysql.9.0.0.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\system.codedom\\6.0.0\\system.codedom.6.0.0.nupkg.sha512",
@@ -44,20 +47,8 @@
     "C:\\Users\\Work station\\.nuget\\packages\\system.composition.hosting\\7.0.0\\system.composition.hosting.7.0.0.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\system.composition.runtime\\7.0.0\\system.composition.runtime.7.0.0.nupkg.sha512",
     "C:\\Users\\Work station\\.nuget\\packages\\system.composition.typedparts\\7.0.0\\system.composition.typedparts.7.0.0.nupkg.sha512",
-    "C:\\Users\\Work station\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.19.2\\system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512"
+    "C:\\Users\\Work station\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.19.2\\system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512",
+    "C:\\Users\\Work station\\.nuget\\packages\\system.io.hashing\\11.0.0\\system.io.hashing.11.0.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1902",
-      "level": "Warning",
-      "message": "Package 'MySqlConnector' 2.4.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-473q-m89c-ghf8",
-      "projectPath": "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj",
-      "warningLevel": 1,
-      "filePath": "E:\\Work\\pro project\\OTU.hub\\backend\\backend.csproj",
-      "libraryId": "MySqlConnector",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    }
-  ]
+  "logs": []
 }

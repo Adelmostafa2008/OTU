@@ -33,7 +33,7 @@ namespace backend.Controllers
         }
 
         [HttpPost ("create")]
-        [Authorize] // (Roles = "admin")
+        //[Authorize] // (Roles = "admin")
         public async Task<IActionResult> CreateNew([FromBody] UserDTO user)
         {
             try
@@ -65,7 +65,7 @@ namespace backend.Controllers
                     Group = user.Group,
                     Email = user.email,
                     givenName = user.name,
-                    UserName = user.name.Split(" ")[0] + ".OTU-"+ user.code 
+                    UserName = user.code == "student" ? user.name.Split(" ")[0] + ".OTU-"+ user.code :user.name.Split(" ")[0] + ".OTU-"+ user.nationalId
                    
                 };
 

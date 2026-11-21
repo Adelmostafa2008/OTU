@@ -42,6 +42,13 @@ namespace backend.Service
 
             if(user == null) return null;
 
+            var role = await _manager.GetRolesAsync(user);
+
+            if(role[0] == "admin")
+            {
+                user_id = "admin";
+            }
+
             UploadSort sort = new UploadSort()
             {
                 Division = user.Division,
@@ -64,7 +71,8 @@ namespace backend.Service
                subject = quiz.Subject,
                title = quiz.Title,
                year = quiz.Year  ,
-               uploadername = quiz.UploaderName
+               uploadername = quiz.UploaderName,
+               iscreator = user_id != "admin" ? user_id == quiz.UploaderId : true
             };
         }
 

@@ -53,6 +53,13 @@ namespace backend.Service
 
             if(meet == null) return null;
 
+            var role = await _manager.GetRolesAsync(user);
+
+            if(role[0] == "admin")
+            {
+                user_id = "admin";
+            }
+
             return  new
             {
                division = meet.Division,
@@ -64,7 +71,8 @@ namespace backend.Service
                subject = meet.Subject,
                title = meet.Title,
                year = meet.Year  ,
-               uploadername = meet.UploaderName
+               uploadername = meet.UploaderName,
+               iscreator = user_id != "admin" ? user_id == meet.UploaderId : true
             };
         }
 

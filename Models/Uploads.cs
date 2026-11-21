@@ -25,19 +25,20 @@ namespace backend.Models
         public string ?UploaderId {get;set;}
         public User ?Uploader {get;set;} 
         public string ?UploaderName {get;set;}
+        public string ?Link {get;set;}
+        public string ?Text {get;set;}
+        public string ?Type {get;set;}
     }
 
     public class Lessons : GeneralUploads
     {
-        
-        public string Link {get;set;}
         public DateTime UploadDate {get;set;} 
-        public string Type {get;set;}
+        public Dictionary<string , string> ?files{get;set;}
     }
 
     public class Quizzes : GeneralUploads
     {
-       
+        public Dictionary<string , string> ?files{get;set;}
         public DateTime QuizDate {get;set;} 
     }
 
@@ -49,6 +50,7 @@ namespace backend.Models
 
     public class Assignments : GeneralUploads
     {
+        public Dictionary<string , string> ?files{get;set;}
         public DateTime Deadline {get;set;}
     }
 }

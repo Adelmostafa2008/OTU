@@ -25,6 +25,7 @@ namespace backend.Service
         public int id {get;set;}
         public string ?msg {get;set;}
         public string ?uploadername {get;set;}
+        public bool iscreator {get;set;}
     }
     public class AssignmentService
     {
@@ -109,6 +110,8 @@ namespace backend.Service
 
             if(user == null) return new Assignment_result {flag =false , msg = "Invalid User ID."};
 
+            var role = await _manager.GetRolesAsync(user);
+
             UploadSort sort = new UploadSort
             {
                 Division = user.Division,
@@ -122,7 +125,14 @@ namespace backend.Service
 
             AssignmentMapper mapper = new AssignmentMapper{};
 
-            Assignment_result result = mapper.GetAssignmentMapper(assignment);
+            string user_id = user.Id;
+
+            if(role[0] == "admin")
+            {
+                user_id = "admin";
+            }
+
+            Assignment_result result = mapper.GetAssignmentMapper(assignment , user_id);
 
             return result;
         }

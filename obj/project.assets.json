@@ -2,6 +2,52 @@
   "version": 4,
   "targets": {
     "net10.0": {
+      "AWSSDK.Core/4.1.1": {
+        "type": "package",
+        "dependencies": {
+          "AWSSDK.Extensions.Numerics": "[4.1.0, 5.0.0)",
+          "System.IO.Hashing": "11.0.0"
+        },
+        "compile": {
+          "lib/net10.0/AWSSDK.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/AWSSDK.Core.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "AWSSDK.Extensions.Numerics/4.1.0": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/AWSSDK.Extensions.Numerics.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/AWSSDK.Extensions.Numerics.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "AWSSDK.S3/4.1.0.1": {
+        "type": "package",
+        "dependencies": {
+          "AWSSDK.Core": "[4.1.1, 5.0.0)"
+        },
+        "compile": {
+          "lib/net10.0/AWSSDK.S3.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/AWSSDK.S3.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "CloudinaryDotNet/1.29.3": {
         "type": "package",
         "dependencies": {
@@ -672,15 +718,15 @@
           "buildTransitive/Mono.TextTemplating.targets": {}
         }
       },
-      "MySqlConnector/2.4.0": {
+      "MySqlConnector/3.0.0": {
         "type": "package",
         "compile": {
-          "lib/net9.0/MySqlConnector.dll": {
+          "lib/net10.0/MySqlConnector.dll": {
             "related": ".xml"
           }
         },
         "runtime": {
-          "lib/net9.0/MySqlConnector.dll": {
+          "lib/net10.0/MySqlConnector.dll": {
             "related": ".xml"
           }
         }
@@ -857,10 +903,100 @@
             "related": ".xml"
           }
         }
+      },
+      "System.IO.Hashing/11.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/System.IO.Hashing.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/System.IO.Hashing.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net10.0/_._": {}
+        }
       }
     }
   },
   "libraries": {
+    "AWSSDK.Core/4.1.1": {
+      "sha512": "MGURtuvtalMXUaRKCTJv4f3XrwLTcZgrIGfthnOt1Qqol6rTtNKoF0ZusQc12+Z7V9e/UsarZ7AXhh8vMIm76A==",
+      "type": "package",
+      "path": "awssdk.core/4.1.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "analyzers/dotnet/cs/AWSSDK.Core.CodeAnalysis.dll",
+        "analyzers/dotnet/cs/SharedAnalysisCode.dll",
+        "awssdk.core.4.1.1.nupkg.sha512",
+        "awssdk.core.nuspec",
+        "images/AWSLogo.png",
+        "lib/net10.0/AWSSDK.Core.dll",
+        "lib/net10.0/AWSSDK.Core.xml",
+        "lib/net11.0/AWSSDK.Core.dll",
+        "lib/net11.0/AWSSDK.Core.xml",
+        "lib/net472/AWSSDK.Core.dll",
+        "lib/net472/AWSSDK.Core.xml",
+        "lib/net8.0/AWSSDK.Core.dll",
+        "lib/net8.0/AWSSDK.Core.xml",
+        "lib/netstandard2.0/AWSSDK.Core.dll",
+        "lib/netstandard2.0/AWSSDK.Core.xml"
+      ]
+    },
+    "AWSSDK.Extensions.Numerics/4.1.0": {
+      "sha512": "hhoiXT1aUyVgIiQbQoqG3L1EEneqXDh2GKyH5izUlO6Rzi9GAAi8S6mlLiVwow23+EGg77zHjdmUi+ia3RSUTg==",
+      "type": "package",
+      "path": "awssdk.extensions.numerics/4.1.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "awssdk.extensions.numerics.4.1.0.nupkg.sha512",
+        "awssdk.extensions.numerics.nuspec",
+        "images/AWSLogo.png",
+        "lib/net10.0/AWSSDK.Extensions.Numerics.dll",
+        "lib/net10.0/AWSSDK.Extensions.Numerics.xml",
+        "lib/net11.0/AWSSDK.Extensions.Numerics.dll",
+        "lib/net11.0/AWSSDK.Extensions.Numerics.xml",
+        "lib/net472/AWSSDK.Extensions.Numerics.dll",
+        "lib/net472/AWSSDK.Extensions.Numerics.xml",
+        "lib/net8.0/AWSSDK.Extensions.Numerics.dll",
+        "lib/net8.0/AWSSDK.Extensions.Numerics.xml",
+        "lib/netstandard2.0/AWSSDK.Extensions.Numerics.dll",
+        "lib/netstandard2.0/AWSSDK.Extensions.Numerics.xml"
+      ]
+    },
+    "AWSSDK.S3/4.1.0.1": {
+      "sha512": "ZgNjIc7GwxRvkKbbZVjzEm7Q2H5ZDCAWxsryGahq1/xF292U4UTUEwoiqsSAAPG2kvfmejI1cuVj3VMkKnXJKg==",
+      "type": "package",
+      "path": "awssdk.s3/4.1.0.1",
+      "hasTools": true,
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "analyzers/dotnet/cs/AWSSDK.S3.CodeAnalysis.dll",
+        "analyzers/dotnet/cs/SharedAnalysisCode.dll",
+        "awssdk.s3.4.1.0.1.nupkg.sha512",
+        "awssdk.s3.nuspec",
+        "images/AWSLogo.png",
+        "lib/net10.0/AWSSDK.S3.dll",
+        "lib/net10.0/AWSSDK.S3.xml",
+        "lib/net11.0/AWSSDK.S3.dll",
+        "lib/net11.0/AWSSDK.S3.xml",
+        "lib/net472/AWSSDK.S3.dll",
+        "lib/net472/AWSSDK.S3.xml",
+        "lib/net8.0/AWSSDK.S3.dll",
+        "lib/net8.0/AWSSDK.S3.xml",
+        "lib/netstandard2.0/AWSSDK.S3.dll",
+        "lib/netstandard2.0/AWSSDK.S3.xml",
+        "tools/install.ps1",
+        "tools/uninstall.ps1"
+      ]
+    },
     "CloudinaryDotNet/1.29.3": {
       "sha512": "C9UpTh7YoOrfeUXcdjnsEloTaWKTNeDgvMpWoGAOTkC6HOxPIbcQAiSGhoqPPT8scAKAFjrPzf89nyZkGvtoCg==",
       "type": "package",
@@ -2280,32 +2416,32 @@
         "readme.md"
       ]
     },
-    "MySqlConnector/2.4.0": {
-      "sha512": "78M+gVOjbdZEDIyXQqcA7EYlCGS3tpbUELHvn6638A2w0pkPI625ixnzsa5staAd3N9/xFmPJtkKDYwsXpFi/w==",
+    "MySqlConnector/3.0.0": {
+      "sha512": "ioYpdWl4xa9iVNsnWzIsYUuSr5MJ3KRZJ69QvzQdfDd1ax6s6GDXs65gCTt/eY/fzG4IiYxCgiu5urWUfk3AwQ==",
       "type": "package",
-      "path": "mysqlconnector/2.4.0",
+      "path": "mysqlconnector/3.0.0",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "README.md",
+        "lib/net10.0/MySqlConnector.dll",
+        "lib/net10.0/MySqlConnector.xml",
+        "lib/net11.0/MySqlConnector.dll",
+        "lib/net11.0/MySqlConnector.xml",
         "lib/net462/MySqlConnector.dll",
         "lib/net462/MySqlConnector.xml",
         "lib/net471/MySqlConnector.dll",
         "lib/net471/MySqlConnector.xml",
         "lib/net48/MySqlConnector.dll",
         "lib/net48/MySqlConnector.xml",
-        "lib/net6.0/MySqlConnector.dll",
-        "lib/net6.0/MySqlConnector.xml",
         "lib/net8.0/MySqlConnector.dll",
         "lib/net8.0/MySqlConnector.xml",
-        "lib/net9.0/MySqlConnector.dll",
-        "lib/net9.0/MySqlConnector.xml",
         "lib/netstandard2.0/MySqlConnector.dll",
         "lib/netstandard2.0/MySqlConnector.xml",
         "lib/netstandard2.1/MySqlConnector.dll",
         "lib/netstandard2.1/MySqlConnector.xml",
         "logo.png",
-        "mysqlconnector.2.4.0.nupkg.sha512",
+        "mysqlconnector.3.0.0.nupkg.sha512",
         "mysqlconnector.nuspec"
       ]
     },
@@ -2559,16 +2695,45 @@
         "system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512",
         "system.identitymodel.tokens.jwt.nuspec"
       ]
+    },
+    "System.IO.Hashing/11.0.0": {
+      "sha512": "U+Bv2qCYt6eONi+arSP0QIp4uTO6os6uceBsqiAwruZ+Wo2HrRhO/0tj38M9URJtS+4DhAtT3ka2TGNFYsnhyQ==",
+      "type": "package",
+      "path": "system.io.hashing/11.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net10.0/_._",
+        "buildTransitive/net461/System.IO.Hashing.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/netcoreapp2.0/System.IO.Hashing.targets",
+        "lib/net10.0/System.IO.Hashing.dll",
+        "lib/net10.0/System.IO.Hashing.xml",
+        "lib/net11.0/System.IO.Hashing.dll",
+        "lib/net11.0/System.IO.Hashing.xml",
+        "lib/net462/System.IO.Hashing.dll",
+        "lib/net462/System.IO.Hashing.xml",
+        "lib/netstandard2.0/System.IO.Hashing.dll",
+        "lib/netstandard2.0/System.IO.Hashing.xml",
+        "system.io.hashing.11.0.0.nupkg.sha512",
+        "system.io.hashing.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     "net10.0": [
+      "AWSSDK.S3 >= 4.1.0.1",
       "CloudinaryDotNet >= 1.29.3",
       "Microsoft.AspNetCore.Authentication.JwtBearer >= 10.0.12",
       "Microsoft.AspNetCore.Identity.EntityFrameworkCore >= 9.0.20",
       "Microsoft.AspNetCore.OpenApi >= 10.0.12",
       "Microsoft.EntityFrameworkCore >= 9.0.20",
       "Microsoft.EntityFrameworkCore.Tools >= 9.0.20",
+      "MySqlConnector >= 3.0.0",
       "Pomelo.EntityFrameworkCore.MySql >= 9.0.0"
     ]
   },
@@ -2617,6 +2782,10 @@
         "framework": "net10.0",
         "targetAlias": "net10.0",
         "dependencies": {
+          "AWSSDK.S3": {
+            "target": "Package",
+            "version": "[4.1.0.1, )"
+          },
           "CloudinaryDotNet": {
             "target": "Package",
             "version": "[1.29.3, )"
@@ -2640,6 +2809,10 @@
           "Microsoft.EntityFrameworkCore.Tools": {
             "target": "Package",
             "version": "[9.0.20, )"
+          },
+          "MySqlConnector": {
+            "target": "Package",
+            "version": "[3.0.0, )"
           },
           "Pomelo.EntityFrameworkCore.MySql": {
             "target": "Package",
@@ -3082,17 +3255,5 @@
         }
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1902",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "Package 'MySqlConnector' 2.4.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-473q-m89c-ghf8",
-      "libraryId": "MySqlConnector",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    }
-  ]
+  }
 }

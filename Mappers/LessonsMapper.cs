@@ -10,27 +10,29 @@ namespace backend.Mappers
 {
     public class LessonsMapper
     {
-        public  IList<lessons_result> GetLessonMapper(IList<Lessons> lessons )
+        public  IList<lessons_result> GetLessonMapper(IList<Lessons> lessons , IList<string> urls)
         {
             IList<lessons_result> res = [];
 
-            foreach(var i in lessons)
+            for(int i = 0 ; i < lessons.Count ; i++ )
             {
                 var element = new lessons_result
                 {
-                    division = i.Division,
-                    faculty = i.Faculty,
-                    link = i.Link,
-                    notes = i.Notes,
-                    semester = i.semester,
-                    subject = i.Subject,
-                    title = i.Title,
-                    uploadDate = i.UploadDate,
-                    uploadername = i.UploaderName,
-                    year = i.Year,
-                    type = i.Type,
+                    id = lessons[i].Id,
+                    division = lessons[i].Division,
+                    faculty = lessons[i].Faculty,
+                    link = lessons[i].Link,
+                    notes = lessons[i].Notes,
+                    semester = lessons[i].semester,
+                    subject = lessons[i].Subject,
+                    title = lessons[i].Title,
+                    uploadDate = lessons[i].UploadDate,
+                    uploadername = lessons[i].UploaderName,
+                    year = lessons[i].Year,
+                    type = lessons[i].Type,
                     msg = "",
-                    flag = true
+                    flag = true ,
+                    preveiwurl = urls[i]
                 };
 
                 res.Add(element);
@@ -39,14 +41,40 @@ namespace backend.Mappers
             return res;
         }
 
-        public Lessons UploadLessonMapper(UploadDTO item , User user)
+        public Lessons NormalUploadLessonMapper(UploadAndEditDTO item , User user)
         {
              Lessons newLesson = new Lessons
             {
               Faculty = item.Faculty,
               Division = item.Division,
-              Link = item.Link,
+              Link = item.UploadLink,
               Notes = item.Notes,
+              Text = item.UploadText,
+              semester = item.semester,
+              Subject = item.Subject,
+              Title = item.Title,
+              Year = item.Year  ,
+              Type = item.Type,
+              UploadDate = DateTime.UtcNow
+              ,Uploader = user,
+              UploaderId = user.Id,
+              UploaderName = user.givenName,
+              files = null
+            };
+
+            return newLesson;
+        }
+
+         public Lessons UploadLessonMapperWithDocuments(UploadAndEditDTO item , User user , Dictionary<string , string> fileswithkeys)
+        {
+             Lessons newLesson = new Lessons
+            {
+              Faculty = item.Faculty,
+              Division = item.Division,
+              Link = null,
+              Notes = item.Notes,
+              files = fileswithkeys,
+              Text = null,
               semester = item.semester,
               Subject = item.Subject,
               Title = item.Title,
@@ -59,6 +87,50 @@ namespace backend.Mappers
             };
 
             return newLesson;
+        }
+
+        public void EditLessonMapper(UploadAndEditDTO newLesson , Lessons lesson)
+        {
+            if(!string.IsNullOrEmpty(newLesson.UploadLink) && newLesson.UploadLink != lesson.Link)
+            {
+                lesson.Link = newLesson.UploadLink;
+            }
+            if(!string.IsNullOrEmpty(newLesson.UploadText) && newLesson.UploadText != lesson.Text)
+            {
+                lesson.Text = newLesson.UploadText;
+            }
+            if(!string.IsNullOrEmpty(newLesson.Type) && newLesson.Type != lesson.Type)
+            {
+                lesson.Type = newLesson.Type;
+            }
+            if(!string.IsNullOrEmpty(newLesson.Title) && newLesson.Title != lesson.Title)
+            {
+                lesson.Title = newLesson.Title;
+            }
+            if(!string.IsNullOrEmpty(newLesson.Faculty) && newLesson.Faculty != lesson.Faculty)
+            {
+                lesson.Faculty = newLesson.Faculty;
+            }
+            if(!string.IsNullOrEmpty(newLesson.Division) && newLesson.Division != lesson.Division)
+            {
+                lesson.Division = newLesson.Division;
+            }
+            if(!string.IsNullOrEmpty(newLesson.Subject) && newLesson.Subject != lesson.Subject)
+            {
+                lesson.Subject = newLesson.Subject;
+            }
+            if(newLesson.Year != lesson.Year)
+            {
+                lesson.Year = newLesson.Year;
+            }
+            if(!string.IsNullOrEmpty(newLesson?.semester) && newLesson.semester != lesson.semester)
+            {
+                lesson.semester = newLesson.semester;
+            }
+            if( newLesson?.Notes != lesson.Notes)
+            {
+                lesson.Notes = newLesson?.Notes;
+            }
         }
     }
 }

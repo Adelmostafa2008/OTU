@@ -74,32 +74,15 @@ namespace backend.Controllers
         }
 
         [HttpGet ("lesson/{id}")]
-        public async Task<IActionResult> getUploadById([FromRoute] int id)
+        public async Task<IActionResult> getUploadById([FromRoute] int id , [FromQuery] string userid)
         {
-            if(!ModelState.IsValid) return BadRequest(ModelState);
+            if(!ModelState .IsValid) return BadRequest(ModelState);
 
-            var item = await _lesson.GetById(id);
+            var result = await _student_service.GetLessonByID(id , userid);
 
-            if(item == null)
-            {
-                return NotFound();
-            }
+            if(result.title == "err") return BadRequest(result.notes);
 
-            var veiwItem = new
-            {
-                link = item.Link,
-                division = item.Faculty,
-                faculty = item.Faculty,
-                notes = item.Notes,
-                semester = item.semester,
-                subject = item.Subject,
-                title = item.Title,
-                year = item.Year,
-                type = item.Type,
-                uploadername = item.UploaderName
-            };
-
-            return Ok(veiwItem);
+            return Ok(result);
         }
 
         [HttpGet("getlatest/{userid}")]
@@ -260,9 +243,8 @@ namespace backend.Controllers
         } 
 
         [HttpPost ("phone/{id}")]
-        public async Task<IActionResult> editPhoneNum([FromBody] string phonenum ,[FromRoute] string id)
+        public async Task<IActionResult> editPhoneNum([FromBody] string phone ,[FromRoute] string id)
         {
-            Console.WriteLine($"the {phonenum}");
 
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
@@ -270,11 +252,11 @@ namespace backend.Controllers
 
             if(user == null) return NotFound("No user with such id.");
 
-            user.PhoneNumber = phonenum;
+            user.PhoneNumber = phone;
 
             await _lesson.Save();
 
-            return Ok(new {phone = phonenum});
+            return Ok(new {phone = phone});
         }
 
         [HttpPost("newpass")]

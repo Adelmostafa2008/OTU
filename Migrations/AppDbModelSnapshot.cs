@@ -203,6 +203,9 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Link")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(405)
                         .HasColumnType("varchar(405)");
@@ -211,10 +214,16 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Text")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(105)
                         .HasColumnType("varchar(105)");
+
+                    b.Property<string>("Type")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("UploaderId")
                         .HasColumnType("varchar(255)");
@@ -224,6 +233,9 @@ namespace backend.Migrations
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
+
+                    b.Property<string>("files")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("semester")
                         .HasColumnType("longtext");
@@ -252,7 +264,6 @@ namespace backend.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Link")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("Notes")
@@ -263,13 +274,15 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Text")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(105)
                         .HasColumnType("varchar(105)");
 
                     b.Property<string>("Type")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<DateTime>("UploadDate")
@@ -283,6 +296,9 @@ namespace backend.Migrations
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
+
+                    b.Property<string>("files")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("semester")
                         .HasColumnType("longtext");
@@ -310,6 +326,9 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Link")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(405)
                         .HasColumnType("varchar(405)");
@@ -321,10 +340,16 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Text")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(105)
                         .HasColumnType("varchar(105)");
+
+                    b.Property<string>("Type")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("UploaderId")
                         .HasColumnType("varchar(255)");
@@ -361,6 +386,9 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Link")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(405)
                         .HasColumnType("varchar(405)");
@@ -372,10 +400,16 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Text")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(105)
                         .HasColumnType("varchar(105)");
+
+                    b.Property<string>("Type")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("UploaderId")
                         .HasColumnType("varchar(255)");
@@ -385,6 +419,9 @@ namespace backend.Migrations
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
+
+                    b.Property<string>("files")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("semester")
                         .HasColumnType("longtext");

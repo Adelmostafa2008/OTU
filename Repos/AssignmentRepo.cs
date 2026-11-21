@@ -48,7 +48,7 @@ namespace backend.Repos
 
         public async Task<Assignments> GetAssignment(UploadSort sort, int id)
         {
-            var assignment =  _db.assignments.AsQueryable();
+            var assignment =  _db.assignments.Include(x => x.Uploader).AsQueryable();
 
              if (!string.IsNullOrEmpty(sort.Division))
             {

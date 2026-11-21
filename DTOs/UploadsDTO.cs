@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
+using backend.Service;
 
 namespace backend.DTOs
 {
@@ -18,16 +19,18 @@ namespace backend.DTOs
         public string ? Notes {get;set;}
         [MaxLength(105)]
         public string Title {get;set;}
-        public string ? userid{get;set;}
+        public string ? userid{get;set;} 
+        public string? UploadLink {get;set;}
+        public string ? UploadText {get;set;}
+        public IList<files> ?docs {get;set;}
+        public string ?Type {get;set;}
+        public string ? UploadContentType {get;set;}
     }
-    public class UploadDTO : GeneralUploadDTO
+    public class UploadAndEditDTO : GeneralUploadDTO
     {
-        public string Link {get;set;}
-        public string Type {get;set;}
+       
         
     }
-    public class EditUpDTO : UploadDTO {}
-
 
     public class QuizzUploadDTO : GeneralUploadDTO
     {

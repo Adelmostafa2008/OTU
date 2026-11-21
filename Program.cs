@@ -36,13 +36,15 @@ builder.Services.AddScoped<IOnlineMeetRepo , OnlineMeetRepo>();
 builder.Services.AddScoped<QuizService>();
 builder.Services.AddScoped<OnlineMeetService>();
 builder.Services.AddScoped<StudentService>();
-builder.Services.AddScoped<ConfigurationManager>();
 builder.Services.AddScoped<FileUploadService>();
 builder.Services.AddScoped<IAssignmentRepo , AssignmentRepo>();
+builder.Services.AddScoped<IFilebaseClient , FilebaseClient>();
 builder.Services.AddScoped<AssignmentService>();
+builder.Services.AddScoped<LessonService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
+
 
 builder.Services.AddIdentity<User, IdentityRole>(op =>
 {

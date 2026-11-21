@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using backend.Models;
 using Microsoft.AspNetCore.Identity;
@@ -44,7 +45,31 @@ namespace backend.data
                 .WithMany(u => u.meetings)
                 .HasForeignKey(l => l.UploaderId)
                 .OnDelete(DeleteBehavior.SetNull);
-            
+
+
+
+                builder.Entity<Assignments>()
+                .Property(x => x.files)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(
+                        v, (JsonSerializerOptions?)null)!
+                );
+                builder.Entity<Lessons>()
+                .Property(x => x.files)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(
+                        v, (JsonSerializerOptions?)null)!
+                );
+                builder.Entity<Quizzes>()
+                .Property(x => x.files)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(
+                        v, (JsonSerializerOptions?)null)!
+                );
+                
             builder.Entity<IdentityRole>().HasData(
                 new IdentityRole
                 {
