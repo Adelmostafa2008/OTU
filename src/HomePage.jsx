@@ -8,6 +8,107 @@ import { LessonCardSkeleton } from "./Skeleton";
 import api from "./AxiosHelper";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useAuth } from "./AuthContext";
+import axios from "axios";
+
+// Preview files live in the same cloud storage as lesson files, so they are
+// requested as blobs exactly like LessonDetailsPage does.
+const previewClient = axios.create();
+
+const IMAGE_PREVIEW_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"];
+
+const getPreviewExt = (value) => {
+  if (typeof value !== "string" || !value) return "";
+  let pathname;
+  try {
+    pathname = new URL(value).pathname;
+  } catch {
+    pathname = value.split("?")[0].split("#")[0];
+  }
+  let base = pathname.split("/").pop() || "";
+  try {
+    base = decodeURIComponent(base);
+  } catch {
+    // keep the raw name when it is not valid percent-encoding
+  }
+  const idx = base.lastIndexOf(".");
+  return idx < 0 ? "" : base.slice(idx + 1).toLowerCase();
+};
+
+// The API has shipped this field both as "previewurl" and as "preveiwurl",
+// with inconsistent casing, so match the key the same way every time.
+const PREVIEW_URL_KEYS = ["previewurl", "preveiwurl", "previewuri", "preveiwuri"];
+
+const normalizeLessonKey = (key) => String(key).toLowerCase().replace(/[^a-z]/g, "");
+
+const getLessonFieldValue = (lesson, keys) => {
+  if (!lesson || typeof lesson !== "object") return undefined;
+  const match = Object.keys(lesson).find((key) => keys.includes(normalizeLessonKey(key)));
+  return match === undefined ? undefined : lesson[match];
+};
+
+const pickUrlValue = (value) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const lower = trimmed.toLowerCase();
+    if (!trimmed || lower === "null" || lower === "undefined") return "";
+    return trimmed;
+  }
+  if (Array.isArray(value)) return pickUrlValue(value[0]);
+  if (value && typeof value === "object") {
+    return pickUrlValue(
+      value.url ?? value.Url ?? value.URL ?? value.href ?? value.Href ?? value.path ?? value.Path,
+    );
+  }
+  return "";
+};
+
+// A lesson without a preview url has no documents, so its content is either a
+// link or a text paragraph; when neither field can be read the paragraph is the
+// one that is left, so the card still advertises text content.
+const getLessonContentKind = (lesson) => {
+  const link = pickUrlValue(getLessonFieldValue(lesson, ["link", "uploadlink", "lessonlink"]));
+  if (link) return "link";
+  return "text";
+};
+
+const getLessonPreviewUrl = (lesson) => pickUrlValue(getLessonFieldValue(lesson, PREVIEW_URL_KEYS));
+
+// Returns { status: "image" | "unavailable", url?, sourceUrl, label, isObjectUrl? }
+const loadLessonPreview = async (url) => {
+  const ext = getPreviewExt(url);
+  if (import.meta.env.DEV) {
+    console.info(`[lesson preview] GET ${url}`);
+  }
+  try {
+    const res = await previewClient.get(url, { responseType: "blob", timeout: 20000 });
+    const blob = res.data;
+    const blobType = typeof blob?.type === "string" ? blob.type : "";
+    const isImage = blobType.startsWith("image/") || IMAGE_PREVIEW_EXTS.includes(ext);
+    if (import.meta.env.DEV) {
+      console.info(`[lesson preview] ${res.status} ${blobType || "unknown type"} <- ${url}`);
+    }
+    if (isImage && blob instanceof Blob) {
+      return {
+        status: "image",
+        url: URL.createObjectURL(blob),
+        sourceUrl: url,
+        isObjectUrl: true,
+        label: ext || blobType.split("/")[1] || "",
+      };
+    }
+    return { status: "unavailable", sourceUrl: url, label: ext || blobType.split("/")[1] || "" };
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn(`[lesson preview] FAILED ${url}`, error);
+    }
+    // The bucket may be readable by <img> even when the fetch is blocked
+    // (CORS), so image files still get a chance to render directly.
+    if (IMAGE_PREVIEW_EXTS.includes(ext)) {
+      return { status: "image", url, sourceUrl: url, label: ext };
+    }
+    return { status: "unavailable", sourceUrl: url, label: ext };
+  }
+};
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -24,6 +125,8 @@ const HomePage = () => {
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
   const [loadingMeetings, setLoadingMeetings] = useState(true);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [lessonPreviews, setLessonPreviews] = useState({});
+  const previewUrlsRef = useRef([]);
 
   const isGuest = String(user?.role ?? "").toLowerCase() === "guest";
 
@@ -45,17 +148,50 @@ const HomePage = () => {
         let response;
         if (userId !== undefined && userId !== null && userId !== "") {
           response = await api.get(`/Student/getlatest/${userId}`, { timeout: 15000 });
+
+          console.log(response.data);
+          
         }
         if (cancelled) return;
         const lessonData = response?.data;
         if (!lessonData || (Array.isArray(lessonData) && lessonData.length === 0)) {
           setLessons([]);
           setShowSeeMore(false);
+          setLessonPreviews({});
           return;
         }
         const data = Array.isArray(lessonData) ? lessonData : lessonData ? [lessonData] : [];
         setLessons(data);
         setShowSeeMore(Array.isArray(data) && data.length >= 5);
+
+        previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+        previewUrlsRef.current = [];
+        const previewItems = data
+          .map((item, index) => ({
+            key: String(item?.id ?? item?._id ?? index),
+            url: getLessonPreviewUrl(item),
+          }))
+          .filter((item) => item.url);
+        setLessonPreviews(
+          Object.fromEntries(previewItems.map((item) => [item.key, { status: "loading" }])),
+        );
+        if (previewItems.length > 0) {
+          Promise.all(
+            previewItems.map(async (item) => [item.key, await loadLessonPreview(item.url)]),
+          ).then((results) => {
+            if (cancelled) {
+              results.forEach(([, result]) => {
+                if (result?.isObjectUrl) URL.revokeObjectURL(result.url);
+              });
+              return;
+            }
+            previewUrlsRef.current = results
+              .filter(([, result]) => result?.isObjectUrl)
+              .map(([, result]) => result.url);
+            setLessonPreviews(Object.fromEntries(results));
+          });
+        }
+
         setTimeout(() => {
           if (!cancelled) checkScroll();
         }, 100);
@@ -215,6 +351,13 @@ const HomePage = () => {
   };
 
   useEffect(() => {
+    return () => {
+      previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      previewUrlsRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
     checkScroll();
     const container = scrollContainerRef.current;
     if (container) {
@@ -286,29 +429,59 @@ const HomePage = () => {
                 </div>
               ))
             ) : lessons.length > 0 ? (
-              lessons.map((lesson, i) => (
-                <div
-                  key={lesson.id || lesson._id || i}
-                  className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] h-64"
-                >
-                  <LessonCard
-                    image={lesson?.image}
-                    title={lesson?.title}
-                    subject={lesson?.subject}
-                    description={lesson?.notes}
-                    type={
-                      lesson?.type ??
-                      lesson?.Type ??
-                      lesson?.lessonType ??
-                      lesson?.LessonType ??
-                      lesson?.lesson_type ??
-                      lesson?.kind
-                    }
-                    truncateTitle
-                    truncateNotes
-                  />
-                </div>
-              ))
+              lessons.map((lesson, i) => {
+                const previewKey = String(lesson?.id ?? lesson?._id ?? i);
+                const preview =
+                  lessonPreviews[previewKey] ||
+                  (getLessonPreviewUrl(lesson) ? { status: "loading" } : null);
+                const fallbackImage =
+                  typeof lesson?.image === "string" && lesson.image.trim() !== ""
+                    ? lesson.image
+                    : "";
+                const previewStatus = preview
+                  ? preview.status
+                  : fallbackImage
+                    ? "image"
+                    : "content";
+                const previewKind = preview ? "file" : getLessonContentKind(lesson);
+                return (
+                  <div
+                    key={lesson.id || lesson._id || i}
+                    className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] h-64 cursor-pointer"
+                    onClick={() => navigate(`/lesson/${lesson.id || lesson._id}`)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") navigate(`/lesson/${lesson.id || lesson._id}`);
+                    }}
+                  >
+                    <LessonCard
+                      image={
+                        preview?.status === "image" && preview.url
+                          ? preview.url
+                          : fallbackImage
+                      }
+                      title={lesson?.title}
+                      subject={lesson?.subject}
+                      description={lesson?.notes}
+                      type={
+                        lesson?.type ??
+                        lesson?.Type ??
+                        lesson?.lessonType ??
+                        lesson?.LessonType ??
+                        lesson?.lesson_type ??
+                        lesson?.kind
+                      }
+                      previewStatus={previewStatus}
+                      previewKind={previewKind}
+                      previewLabel={preview?.label || ""}
+                      previewSource={preview?.sourceUrl || getLessonPreviewUrl(lesson)}
+                      truncateTitle
+                      truncateNotes
+                    />
+                  </div>
+                );
+              })
             ) : (
               <div
                 className="w-full h-64 flex items-center justify-center bg-gray-50 border rounded-2xl text-gray-500 text-sm"

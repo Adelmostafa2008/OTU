@@ -34,11 +34,31 @@ const DIVISIONS_BY_FACULTY = {
 const YEARS = ["1", "2", "3", "4"];
 const SEMESTERS = ["first", "second"];
 
-const OPTIONAL_FIELDS = ["notes", "description"];
+// Online meetings never support documents, only a link or text content.
+const CONTENT_TYPES = ["link", "text"];
+const OPTIONAL_FIELDS = ["notes", "description", "UploadLink", "UploadText"];
+
+const normalizeContentData = (data = {}) => {
+  const declared = String(data.UploadContentType || "").trim().toLowerCase();
+  const type = declared === "text" || data.UploadText || data.text ? "text" : "link";
+
+  return {
+    ...data,
+    UploadContentType: type,
+    UploadLink: type === "link" ? (data.UploadLink ?? data.link ?? "") : null,
+    UploadText: type === "text" ? (data.UploadText ?? data.text ?? "") : null,
+    UploadFiles: null,
+  };
+};
 
 const preparePayload = (data) => {
   const payload = {};
   Object.entries(data).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      payload[key] = value;
+      return;
+    }
     if (typeof value !== "string") {
       payload[key] = value;
       return;
@@ -47,6 +67,23 @@ const preparePayload = (data) => {
     if (cleaned === "" && OPTIONAL_FIELDS.includes(key)) return;
     payload[key] = cleaned;
   });
+  return payload;
+};
+
+// Builds the plain JSON body the API expects. Only the properties of the
+// selected content tab get a value; the other one is sent as null.
+const buildSubmissionData = (data) => {
+  const payload = preparePayload(data);
+  const type = data.UploadContentType === "text" ? "text" : "link";
+
+  payload.UploadLink = type === "link" ? String(data.UploadLink ?? "").trim() : null;
+  payload.UploadText = type === "text" ? String(data.UploadText ?? "").trim() : null;
+  // UploadContentType names the selected tab; meetings only support link/text.
+  payload.UploadContentType = type;
+
+  delete payload.docs;
+  delete payload.UploadFiles;
+
   return payload;
 };
 
@@ -59,8 +96,8 @@ const MeetingEditPage = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!location.state?.meeting);
 
-  const [formData, setFormData] = useState(location.state?.meeting || {});
-  const [initialData, setInitialData] = useState(location.state?.meeting || {});
+  const [formData, setFormData] = useState(normalizeContentData(location.state?.meeting || {}));
+  const [initialData, setInitialData] = useState(normalizeContentData(location.state?.meeting || {}));
 
   useEffect(() => {
     if (!user) {
@@ -78,15 +115,18 @@ const MeetingEditPage = () => {
         const userId = user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
         const response = await api.get(`/Student/meet/single/${id}?user_id=${userId}`);
         if (response?.data) {
-          setFormData(response.data);
-          setInitialData(response.data);
+          const normalized = normalizeContentData(response.data);
+          setFormData(normalized);
+          setInitialData(normalized);
         } else {
-          setFormData({});
-          setInitialData({});
+          const empty = normalizeContentData({});
+          setFormData(empty);
+          setInitialData(empty);
         }
       } catch (err) {
-        setFormData({});
-        setInitialData({});
+        const empty = normalizeContentData({});
+        setFormData(empty);
+        setInitialData(empty);
       } finally {
         setFetching(false);
       }
@@ -95,7 +135,9 @@ const MeetingEditPage = () => {
     if (!location.state?.meeting) {
       fetchData();
     } else {
-      setInitialData(location.state?.meeting || {});
+      const normalized = normalizeContentData(location.state?.meeting || {});
+      setFormData(normalized);
+      setInitialData(normalized);
     }
   }, [user, navigate, id, location.state]);
 
@@ -118,7 +160,6 @@ const MeetingEditPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isGuest) return;
-    e.preventDefault();
     if (!formData.title?.trim()) {
       ShowSnackBar("Title is required.", "warn");
       return;
@@ -130,6 +171,15 @@ const MeetingEditPage = () => {
     const notesVal = formData.notes || formData.description || "";
     if (notesVal && String(notesVal).length > 400) {
       ShowSnackBar("Notes must be at most 400 characters.", "warn");
+      return;
+    }
+    const contentType = formData.UploadContentType || "link";
+    if (contentType === "link" && !String(formData.UploadLink || "").trim()) {
+      ShowSnackBar("Please provide a link.", "warn");
+      return;
+    }
+    if (contentType === "text" && !String(formData.UploadText || "").trim()) {
+      ShowSnackBar("Please provide text content.", "warn");
       return;
     }
 
@@ -148,15 +198,15 @@ const MeetingEditPage = () => {
 
     setLoading(true);
     try {
-      const payload = preparePayload(formData);
+      const submission = buildSubmissionData(formData);
       if (dateVal) {
-        payload.OnlineMeetingDate = dateVal;
-        payload.meetingDate = dateVal;
-        payload.date = dateVal;
+        submission.OnlineMeetingDate = dateVal;
+        submission.meetingDate = dateVal;
+        submission.date = dateVal;
       }
-      await api.put(`/OnlineMeeting/${id}`, payload, { withCredentials: true });
+      await api.put(`/OnlineMeeting/${id}`, submission, { withCredentials: true });
       ShowSnackBar("Meeting updated successfully.", "success");
-      navigate(`/meeting/${id}`, { state: { meeting: payload } });
+      navigate(`/meeting/${id}`, { state: { meeting: { ...formData, ...(dateVal ? { OnlineMeetingDate: dateVal } : {}) } } });
     } catch (err) {
       const serverMsg =
         err?.response?.data?.message ?? err?.response?.data?.error ?? null;
@@ -297,11 +347,66 @@ const MeetingEditPage = () => {
 
   const meetingDateValue = getMeetingDateValue();
 
+  const setContentType = (type) => {
+    setFormData((prev) => ({
+      ...prev,
+      UploadContentType: type === "text" ? "text" : "link",
+      UploadLink: type === "link" ? (prev.UploadLink ?? "") : null,
+      UploadText: type === "text" ? (prev.UploadText ?? "") : null,
+      UploadFiles: null,
+    }));
+  };
+
+  const renderContentSection = () => {
+    const type = formData.UploadContentType || "link";
+    const tabBase = "px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors";
+    const activeStyle = { backgroundColor: "var(--color-brand-primary)", color: "#ffffff", borderColor: "var(--color-brand-primary)" };
+    const inactiveStyle = { borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" };
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {CONTENT_TYPES.map((option) => {
+            const active = type === option;
+            const label = option === "link" ? "Link" : option === "text" ? "Text" : "Documents";
+            return (
+              <button key={option} type="button" onClick={() => setContentType(option)} className={`${tabBase} cursor-pointer`} style={active ? activeStyle : inactiveStyle}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {type === "link" && (
+          <div>
+            <label htmlFor="meeting-upload-link" className={labelClass}>Link <span className="text-red-500">*</span></label>
+            <input id="meeting-upload-link" name="UploadLink" type="url" disabled={isGuest} readOnly={isGuest} value={formData.UploadLink || ""} onChange={(e) => setFormData((prev) => ({ ...prev, UploadLink: e.target.value }))} placeholder="https://example.com/resource" className={inputClass} style={fieldStyle} required={!isGuest} />
+          </div>
+        )}
+        {type === "text" && (
+          <div>
+            <label htmlFor="meeting-upload-text" className={labelClass}>Text <span className="text-red-500">*</span></label>
+            <textarea id="meeting-upload-text" name="UploadText" disabled={isGuest} readOnly={isGuest} value={formData.UploadText || ""} onChange={(e) => setFormData((prev) => ({ ...prev, UploadText: e.target.value }))} placeholder="Enter text content..." rows={6} className={`${inputClass} resize-none overflow-y-auto`} style={{ ...fieldStyle, minHeight: "160px" }} required={!isGuest} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const hasChanges = () => {
     const keys = new Set([...Object.keys(formData || {}), ...Object.keys(initialData || {})]);
     for (let key of keys) {
       const current = formData?.[key];
       const initial = initialData?.[key];
+      if (Array.isArray(current) || Array.isArray(initial)) {
+        if (!Array.isArray(current) || !Array.isArray(initial) || current.length !== initial.length) return true;
+        for (let i = 0; i < current.length; i++) {
+          const a = current[i];
+          const b = initial[i];
+          if (a instanceof File || b instanceof File) {
+            if (!(a instanceof File) || !(b instanceof File) || a.name !== b.name || a.size !== b.size || a.lastModified !== b.lastModified) return true;
+          } else if (a !== b) return true;
+        }
+        continue;
+      }
       if (typeof current === "string" && typeof initial === "string") {
         if (current.trim() !== initial.trim()) return true;
         continue;
@@ -349,6 +454,8 @@ const MeetingEditPage = () => {
                   required
                 />
               </div>
+
+              {renderContentSection()}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>

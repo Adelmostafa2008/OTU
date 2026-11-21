@@ -5,7 +5,7 @@ const Footer = () => {
  <footer className="fixed left-[220px] right-0 bottom-0 h-12 bg-white border-t border-gray-300 flex items-center justify-center px-6 box-border z-40">
  <div className="text-center">
  <span className="text-xs text-gray-500 tracking-[0.02em]">
- © {year}{""}
+ © {year}{" "}
  <span className="text-gray-700 font-semibold">
  <span style={{ color:'var(--color-brand-primary)' }}>OTU</span>
  <span className="text-black">.hub , All Rights Reserved</span>

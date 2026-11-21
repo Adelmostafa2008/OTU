@@ -69,6 +69,14 @@ const STUDENT_REQUIRED_FIELDS = [
 
 const STAFF_REQUIRED_FIELDS = ["name", "email", "password", "nationalId"];
 
+// Each role tab keeps its own draft so switching tabs never clears or
+// overwrites what was already typed in another tab.
+const emptyDrafts = () => ({
+  student: { ...emptyUser },
+  instructor: { ...emptyUser },
+  admin: { ...emptyUser },
+});
+
 const findMissingFields = (data, requiredFields) =>
   requiredFields
     .filter((field) => !String(data[field] ?? "").trim())
@@ -131,9 +139,11 @@ const AddUser = () => {
   const navigate = useNavigate();
   const { ShowSnackBar } = useSnack();
   const [loading, setLoading] = useState(false);
-  const [userData, setUserData] = useState(emptyUser);
+  const [drafts, setDrafts] = useState(emptyDrafts);
   const [showPassword, setShowPassword] = useState(false);
   const [activeRole, setActiveRole] = useState("student");
+
+  const userData = drafts[activeRole] ?? emptyUser;
 
   const canAccessAddUser =
     String(user?.role ?? "").toLowerCase() === "admin" ||
@@ -164,14 +174,15 @@ const AddUser = () => {
     } else if (name === "code" && typeof value === "string") {
       nextValue = value.replace(/\D/g, "").slice(0, 5);
     } else if (name === "nationalId" && typeof value === "string") {
-      nextValue = value.replace(/\D/g, "").slice(0, 20);
+      nextValue = value.replace(/\D/g, "").slice(0, 14);
     }
-    setUserData((prev) => {
-      const next = { ...prev, [name]: nextValue };
+    setDrafts((prev) => {
+      const current = prev[activeRole] ?? emptyUser;
+      const next = { ...current, [name]: nextValue };
       if (name === "Faculty") {
         next.Division = "";
       }
-      return next;
+      return { ...prev, [activeRole]: next };
     });
   };
 
@@ -225,7 +236,8 @@ const AddUser = () => {
           role: "student",
         };
       }
-
+      console.log(payload);
+      
       const response = await api.post("/Reg/create", payload, {
         withCredentials: true,
       });
@@ -237,7 +249,9 @@ const AddUser = () => {
           : response?.data?.message) ||
         "User added successfully.";
       ShowSnackBar(successMsg, "success");
-      setUserData(emptyUser);
+      // Only the tab that was submitted is cleared; the other tabs keep
+      // whatever the user already typed in them.
+      setDrafts((prev) => ({ ...prev, [activeRole]: { ...emptyUser } }));
       setShowPassword(false);
     } catch (err) {
       ShowSnackBar(
@@ -471,6 +485,7 @@ const AddUser = () => {
                     name="nationalId"
                     type="text"
                     inputMode="numeric"
+                    maxLength={14}
                     value={userData.nationalId}
                     onChange={handleChange}
                     placeholder="Enter national ID"

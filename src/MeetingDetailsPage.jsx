@@ -29,6 +29,45 @@ const formatMeetingDateTime = (dateString) => {
   const formattedTime = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "numeric" });
   return { formattedDate, formattedTime };
 };
+const getIsCreator = (item) => {
+  const flag =
+    item?.iscreator ?? item?.isCreator ?? item?.IsCreator ?? item?.Iscreator;
+  return flag === true || flag === 1 || flag === "true";
+};
+
+const getErrorMessage = (err, fallback) => {
+  const data = err?.response?.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (typeof err?.plainMessage === "string" && err.plainMessage.trim())
+    return err.plainMessage.trim();
+  if (typeof err?.message === "string" && err.message.trim()) return err.message.trim();
+  if (data && typeof data === "object") {
+    const direct = data.message ?? data.error ?? data.msg ?? data.title ?? data.detail;
+    if (typeof direct === "string" && direct.trim()) return direct.trim();
+    if (data.errors && typeof data.errors === "object") {
+      const first = Object.values(data.errors).flat().find((item) => item);
+      if (first) return String(first);
+    }
+  }
+  if (err?.code === "ERR_NETWORK" || (!err?.response && err?.request)) {
+    return "Network error. Please check your connection and try again.";
+  }
+  return fallback;
+};
+
+const getSuccessMessage = (res, fallback) => {
+  const data = res?.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (typeof res?.plainMessage === "string" && res.plainMessage.trim())
+    return res.plainMessage.trim();
+  if (typeof res?.message === "string" && res.message.trim()) return res.message.trim();
+  if (data && typeof data === "object") {
+    const direct = data.message ?? data.msg ?? data.title ?? data.detail;
+    if (typeof direct === "string" && direct.trim()) return direct.trim();
+  }
+  return fallback;
+};
+
 const getUploaderDisplayName = (item) => {
   const fullName = item?.uploadername ?? item?.uplodername ?? item?.uploaderName;
   if (typeof fullName !== "string") return null;
@@ -67,21 +106,17 @@ const MeetingDetailsPage = () => {
     fetchMeeting();
   }, [id, user]);
 
-  const canEdit = user && (user.role === "admin" || user.role === "instructor");
-
   const handleDelete = async () => {
     if (isGuest) return;
     const confirmed = window.confirm("Are you sure you want to delete this online meeting?");
     if (!confirmed) return;
 
     try {
-      await api.delete(`/OnlineMeeting/${id}`);
-      ShowSnackBar("Deleted successfully.", "success");
+      const res = await api.delete(`/OnlineMeeting/${id}`);
+      ShowSnackBar(getSuccessMessage(res, "Deleted successfully."), "success");
       navigate("/");
     } catch (err) {
-      const serverMsg =
-        err?.response?.data?.message ?? err?.response?.data?.error ?? null;
-      ShowSnackBar(serverMsg || "Failed to delete.", "error");
+      ShowSnackBar(getErrorMessage(err, "Failed to delete."), "error");
     }
   };
 
@@ -112,6 +147,7 @@ const MeetingDetailsPage = () => {
   const formatted = formatMeetingDateTime(date);
   const description = data.description || data.notes || null;
   const uploaderDisplayName = getUploaderDisplayName(data);
+  const isCreator = getIsCreator(data);
 
   const infoFields = [
     { label: "Description/Notes", value: description || "No description assigned" },
@@ -152,7 +188,7 @@ const MeetingDetailsPage = () => {
             </div>
           ) : null}
         </div>
-        {canEdit ? (
+        {isCreator ? (
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleEdit}

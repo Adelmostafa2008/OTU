@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
 import { useSnack } from "./SnackBarContext.jsx";
+import axios from "axios";
+
+const s3Client = axios.create();
 
 const SUBJECTS = [
   "Math",
@@ -33,10 +36,21 @@ const DIVISIONS_BY_FACULTY = {
 const YEARS = ["1", "2", "3", "4"];
 const SEMESTERS = ["first", "second"];
 const LESSON_TYPES = ["Lab", "Lecture"];
+const CONTENT_TYPES = ["link", "text", "documents"];
+// Online meetings never support documents, only a link or text content.
+const MEETING_CONTENT_TYPES = ["link", "text"];
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_FILE_SIZE_LABEL = "50MB";
 
-const emptyLesson = {
+const baseContentFields = () => ({
+  UploadContentType: "link",
+  UploadLink: "",
+  UploadText: null,
+  UploadFiles: null,
+});
+
+const emptyLesson = () => ({
   title: "",
-  link: "",
   type: "Lecture",
   faculty: "",
   division: "",
@@ -44,10 +58,11 @@ const emptyLesson = {
   year: "",
   semester: "",
   notes: "",
-  userid:""
-};
+  userid: "",
+  ...baseContentFields(),
+});
 
-const emptyQuiz = {
+const emptyQuiz = () => ({
   title: "",
   faculty: "",
   division: "",
@@ -56,10 +71,11 @@ const emptyQuiz = {
   semester: "",
   notes: "",
   QuizDate: "",
-  userid:""
-};
+  userid: "",
+  ...baseContentFields(),
+});
 
-const emptyMeeting = {
+const emptyMeeting = () => ({
   title: "",
   faculty: "",
   division: "",
@@ -68,10 +84,11 @@ const emptyMeeting = {
   semester: "",
   notes: "",
   OnlineMeetingDate: "",
-  userid:""
-};
+  userid: "",
+  ...baseContentFields(),
+});
 
-const emptyAssignment = {
+const emptyAssignment = () => ({
   title: "",
   faculty: "",
   division: "",
@@ -80,16 +97,22 @@ const emptyAssignment = {
   semester: "",
   notes: "",
   deadline: "",
-  userid:""
-};
+  userid: "",
+  ...baseContentFields(),
+});
 
 // Empty optional fields are dropped because empty strings can fail
 // server-side validation on fields that are supposed to be omitted.
-const OPTIONAL_FIELDS = ["notes"];
+const OPTIONAL_FIELDS = ["notes", "UploadLink", "UploadText"];
 
 const preparePayload = (data) => {
   const payload = {};
   Object.entries(data).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      payload[key] = value;
+      return;
+    }
     if (typeof value !== "string") {
       payload[key] = value;
       return;
@@ -101,9 +124,118 @@ const preparePayload = (data) => {
   return payload;
 };
 
+// Files are never sent to the API. Only a light descriptor is sent (the actual
+// bytes go to the cloud storage separately), matching the server `docs` DTO.
+const toDocDescriptor = (file) => {
+  if (!file) return null;
+  const isFile = typeof File !== "undefined" && file instanceof File;
+  const filename = isFile ? file.name : file.filename ?? file.name ?? "";
+  const size = isFile ? file.size : Number(file.size ?? 0);
+  const contentType = isFile ? file.type || "application/octet-stream" : "no type assigned"
+
+  return {
+    filename: String(filename),
+    size: Number.isFinite(size) ? size : 0,
+    content_type: String(contentType),
+  };
+};
+
+const buildDocs = (files) =>
+  (Array.isArray(files) ? files : []).map(toDocDescriptor).filter(Boolean);
+
+const formatFileSize = (bytes) => {
+  const size = Number(bytes) || 0;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
+
+const getFilesTotalSize = (files) =>
+  (Array.isArray(files) ? files : []).reduce((sum, file) => {
+    const size = file instanceof File ? file.size : Number(file?.size ?? 0);
+    return sum + (Number.isFinite(size) ? size : 0);
+  }, 0);
+
+// After the API creates the records it answers with one presigned URL per file.
+// The bytes are then put straight into the cloud storage, exactly like the
+// lesson tab does it. Non-file entries (already saved descriptors) are skipped.
+const uploadFilesToStorage = async (response, files) => {
+  if (!Array.isArray(response?.data)) return;
+  const list = Array.isArray(files) ? files : [];
+
+  await Promise.all(
+    response.data.map(async (item, index) => {
+      const file = list[index];
+      if (!file || !(file instanceof File)) return;
+
+      await s3Client.put(item.url, file, {
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+    }),
+  );
+};
+
+// Builds the plain JSON body the API expects. Only the properties of the
+// selected content tab get a value; the rest are sent as null.
+const buildSubmissionData = (data, { allowDocuments = true } = {}) => {
+  const { UploadFiles, ...rest } = data;
+  const payload = preparePayload(rest);
+
+  const type = !allowDocuments
+    ? data.UploadContentType === "text"
+      ? "text"
+      : "link"
+    : data.UploadContentType || "link";
+
+  const docs = allowDocuments && type === "documents" ? buildDocs(UploadFiles) : null;
+
+  payload.UploadLink = type === "link" ? String(data.UploadLink ?? "").trim() : null;
+  payload.UploadText = type === "text" ? String(data.UploadText ?? "").trim() : null;
+
+  // UploadContentType names the selected tab: "link", "text" or "documents".
+  payload.UploadContentType = type;
+
+  if (allowDocuments) {
+    payload.docs = docs;
+  } else {
+    delete payload.docs;
+    delete payload.UploadFiles;
+  }
+
+  return payload;
+};
+
+const validateContentFields = (data, showSnack, { allowDocuments = true } = {}) => {
+  const type = allowDocuments ? data.UploadContentType || "link" : data.UploadContentType === "text" ? "text" : "link";
+  if (type === "link") {
+    if (!String(data.UploadLink || "").trim()) {
+      showSnack("Please provide a link.", "warn");
+      return false;
+    }
+  } else if (type === "text") {
+    if (!String(data.UploadText || "").trim()) {
+      showSnack("Please provide text content.", "warn");
+      return false;
+    }
+  } else if (type === "documents") {
+    const files = Array.isArray(data.UploadFiles) ? data.UploadFiles : [];
+    if (files.length === 0) {
+      showSnack("Please select at least one document.", "warn");
+      return false;
+    }
+    if (getFilesTotalSize(files) > MAX_FILE_SIZE) {
+      showSnack(`Total file size cannot exceed ${MAX_FILE_SIZE_LABEL} per upload.`, "warn");
+      return false;
+    }
+  }
+  return true;
+};
+
 const FIELD_LABELS = {
   title: "Title",
-  link: "Link",
   type: "Type",
   subject: "Subject",
   faculty: "Faculty",
@@ -114,9 +246,12 @@ const FIELD_LABELS = {
   QuizDate: "Quiz Date",
   OnlineMeetingDate: "Online Meeting Date",
   deadline: "Deadline",
+  UploadLink: "Link",
+  UploadText: "Text",
+  UploadFiles: "Documents",
 };
 
-const LESSON_REQUIRED = ["title", "link", "type", "subject", "faculty", "division", "year", "semester"];
+const LESSON_REQUIRED = ["title", "type", "subject", "faculty", "division", "year", "semester"];
 const QUIZ_REQUIRED = ["title", "faculty", "division", "subject", "year", "semester", "QuizDate"];
 const MEETING_REQUIRED = [
   "title",
@@ -184,6 +319,226 @@ const validateTextLimits = (data, ShowSnackBarFn) => {
   return true;
 };
 
+const inputClass =
+  "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
+const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
+const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
+const fieldStyle = { borderColor: "var(--color-border-primary)" };
+
+const ContentSection = ({ data, setter, idPrefix, disabled = false, allowedTypes = CONTENT_TYPES, onSetContentType, onFileSelection, onRemoveFile, onAddMoreFiles }) => {
+    const type = data.UploadContentType || "link";
+    const tabBase =
+      "px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors";
+    const activeStyle = { backgroundColor: "var(--color-brand-primary)", color: "#ffffff", borderColor: "var(--color-brand-primary)" };
+    const inactiveStyle = { borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" };
+    const files = Array.isArray(data.UploadFiles) ? data.UploadFiles : [];
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {allowedTypes.map((option) => {
+            const active = type === option;
+            const label = option === "link" ? "Link" : option === "text" ? "Text" : "Documents";
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onSetContentType(setter, option)}
+                className={`${tabBase} cursor-pointer`}
+                style={active ? activeStyle : inactiveStyle}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {type === "link" && (
+          <div>
+            <label htmlFor={`${idPrefix}-upload-link`} className={labelClass}>
+              Link <span className="text-red-500">*</span>
+            </label>
+            <input
+              id={`${idPrefix}-upload-link`}
+              name="UploadLink"
+              type="url"
+              disabled={disabled}
+              value={data.UploadLink || ""}
+              onChange={(e) => setter((prev) => ({ ...prev, UploadLink: e.target.value }))}
+              placeholder="https://example.com/resource"
+              className={inputClass}
+              style={fieldStyle}
+              required={!disabled}
+            />
+          </div>
+        )}
+
+        {type === "text" && (
+          <div>
+            <label htmlFor={`${idPrefix}-upload-text`} className={labelClass}>
+              Text <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id={`${idPrefix}-upload-text`}
+              name="UploadText"
+              disabled={disabled}
+              value={data.UploadText || ""}
+              onChange={(e) => setter((prev) => ({ ...prev, UploadText: e.target.value }))}
+              placeholder="Enter text content..."
+              rows={6}
+              className={`${inputClass} resize-none overflow-y-auto`}
+              style={{ ...fieldStyle, minHeight: "160px" }}
+              required={!disabled}
+            />
+          </div>
+        )}
+
+        {type === "documents" && (
+          <div>
+            <label className={labelClass}>
+              Documents <span className="text-red-500">*</span>
+            </label>
+            <div
+              className="w-full rounded-2xl border-2 border-dashed p-5 sm:p-6 flex flex-col items-stretch text-center bg-gray-50/60"
+              style={{ borderColor: "var(--color-border-primary)" }}
+            >
+              <div className="flex flex-col items-center justify-center">
+                <input
+                  id={`${idPrefix}-upload-files`}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  disabled={disabled}
+                  onChange={(e) => onFileSelection(setter, e)}
+                />
+                <input
+                  id={`${idPrefix}-upload-files-add`}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  disabled={disabled}
+                  onChange={(e) => onFileSelection(setter, e, { append: true })}
+                />
+                {files.length === 0 && (
+                  <>
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
+                    style={{ backgroundColor: "rgba(0,0,0,0.04)", color: "var(--color-brand-primary)" }}
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 16V4" />
+                      <path d="M7 9l5-5 5 5" />
+                      <path d="M4 20h16" />
+                    </svg>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={(e) => {
+                      if (disabled) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      document.getElementById(`${idPrefix}-upload-files`)?.click();
+                    }}
+                    className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+                    style={{ backgroundColor: "var(--color-brand-primary)" }}
+                  >
+                    Browse
+                  </button>
+                  <p className="m-0 mt-2 text-xs text-gray-500">Maximum total size {MAX_FILE_SIZE_LABEL}</p>
+                  </>
+                )}
+              </div>
+
+              {files.length > 0 && (() => {
+                const totalSize = getFilesTotalSize(files);
+                const atLimit = totalSize >= MAX_FILE_SIZE;
+                return (
+                  <div className="w-full text-left rounded-2xl border bg-white p-4 sm:p-5" style={{ borderColor: "var(--color-border-primary)" }}>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
+                        <svg viewBox="0 0 20 20" className="w-5 h-5" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {files.length} file{files.length > 1 ? "s" : ""} selected
+                      </div>
+                      <div className="text-xs sm:text-sm font-medium text-gray-600">
+                        Total: <span className={totalSize > MAX_FILE_SIZE ? "text-red-600 font-semibold" : "text-gray-900 font-semibold"}>{formatFileSize(totalSize)}</span>
+                        <span className="text-gray-400"> / {MAX_FILE_SIZE_LABEL}</span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {files.map((file, idx) => {
+                          const name = file.name || file.filename || "file";
+                          const size = file instanceof File ? file.size : Number(file.size ?? 0);
+                          return (
+                            <div
+                              key={`${name}-${idx}-${size}`}
+                              className="group flex items-start gap-3 rounded-xl border bg-gray-50/70 p-3 sm:p-3.5 min-w-0"
+                              style={{ borderColor: "var(--color-border-primary)" }}
+                              title={name}
+                            >
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white border text-gray-600 shadow-sm" style={{ borderColor: "var(--color-border-primary)" }} aria-hidden="true">
+                                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <path d="M14 2v6h6" />
+                                </svg>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="m-0 text-sm font-semibold text-gray-900 leading-snug break-words line-clamp-3">
+                                  {name}
+                                </p>
+                                <p className="m-0 mt-1 text-xs text-gray-500">
+                                  {formatFileSize(size)}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => onRemoveFile(setter, idx)}
+                                className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white text-gray-500 transition-colors ${disabled ? "opacity-50 cursor-not-allowed" : "hover:text-red-600 hover:border-red-200 hover:bg-red-50 cursor-pointer"}`}
+                                style={{ borderColor: "var(--color-border-primary)" }}
+                                aria-label={`Remove ${name}`}
+                                title="Remove file"
+                              >
+                                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-center sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => onAddMoreFiles(idPrefix, files, disabled)}
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${atLimit ? "opacity-50" : "hover:bg-gray-50"}`}
+                        style={{ borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" }}
+                        aria-label="Add more files"
+                      >
+                        <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                        Add more
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
 const Upload = () => {
   const { user, loading: authLoading, isGuest } = useAuth();
   const navigate = useNavigate();
@@ -200,10 +555,19 @@ const Upload = () => {
     ShowSnackBar(msg, ty);
   };
 
-  const [lessonData, setLessonData] = useState(emptyLesson, emptyLesson.userid = user.id);
-  const [quizData, setQuizData] = useState(emptyQuiz , emptyQuiz.userid = user.id);
-  const [meetingData, setMeetingData] = useState(emptyMeeting , emptyMeeting.userid = user.id);
-  const [assignmentData, setAssignmentData] = useState(emptyAssignment , emptyAssignment.userid = user.id);
+  const [lessonData, setLessonData] = useState(() => ({ ...emptyLesson(), userid: user?.id || "" }));
+  const [quizData, setQuizData] = useState(() => ({ ...emptyQuiz(), userid: user?.id || "" }));
+  const [meetingData, setMeetingData] = useState(() => ({ ...emptyMeeting(), userid: user?.id || "" }));
+  const [assignmentData, setAssignmentData] = useState(() => ({ ...emptyAssignment(), userid: user?.id || "" }));
+
+  useEffect(() => {
+    if (user?.id) {
+      setLessonData((prev) => ({ ...prev, userid: user.id }));
+      setQuizData((prev) => ({ ...prev, userid: user.id }));
+      setMeetingData((prev) => ({ ...prev, userid: user.id }));
+      setAssignmentData((prev) => ({ ...prev, userid: user.id }));
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -234,6 +598,7 @@ const Upload = () => {
   const handleMeetingChange = handleChange(setMeetingData);
   const handleAssignmentChange = handleChange(setAssignmentData);
 
+
   const handleLessonSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -246,15 +611,21 @@ const Upload = () => {
     if (!validateTextLimits(lessonData, handelSnack)) {
       return;
     }
+    if (!validateContentFields(lessonData, handelSnack)) {
+      return;
+    }
 
     setLoading(true);
 
     try {
-      const response = await api.post("/Upload", preparePayload(lessonData), {
+      const submission = buildSubmissionData({ ...lessonData, userid: user?.id || lessonData.userid });
+
+      const response = await api.post("/Upload", submission, {
         withCredentials: true,
       });
+      await uploadFilesToStorage(response, lessonData.UploadFiles);
       handelSnack(response?.data?.message ?? "Lesson uploaded successfully.", "success");
-      setLessonData(emptyLesson);
+      setLessonData({ ...emptyLesson(), userid: user?.id || "" });
     } catch (err) {
       handelSnack(
         getErrorMessage(err, "Failed to upload lesson. Please try again."),
@@ -277,6 +648,9 @@ const Upload = () => {
     if (!validateTextLimits(quizData, handelSnack)) {
       return;
     }
+    if (!validateContentFields(quizData, handelSnack)) {
+      return;
+    }
 
     if (quizData.QuizDate) {
       const selectedDate = new Date(quizData.QuizDate + "T00:00:00");
@@ -291,11 +665,14 @@ const Upload = () => {
     setLoading(true);
 
     try {
-      const response = await api.post("/Quizzes", preparePayload(quizData), {
+      const submission = buildSubmissionData({ ...quizData, userid: user?.id || quizData.userid });
+      
+      const response = await api.post("/Quizzes", submission, {
         withCredentials: true,
       });
+      await uploadFilesToStorage(response, quizData.UploadFiles);
       handelSnack(response?.data?.message ?? "Quiz uploaded successfully.", "success");
-      setQuizData(emptyQuiz);
+      setQuizData({ ...emptyQuiz(), userid: user?.id || "" });
     } catch (err) {
       handelSnack(
         getErrorMessage(err, "Failed to upload quiz. Please try again."),
@@ -318,6 +695,9 @@ const Upload = () => {
     if (!validateTextLimits(meetingData, handelSnack)) {
       return;
     }
+    if (!validateContentFields(meetingData, handelSnack, { allowDocuments: false })) {
+      return;
+    }
 
     if (meetingData.OnlineMeetingDate) {
       const selectedDate = new Date(meetingData.OnlineMeetingDate);
@@ -334,11 +714,15 @@ const Upload = () => {
     setLoading(true);
 
     try {
-      const response = await api.post("/OnlineMeeting", preparePayload(meetingData), {
+      const submission = buildSubmissionData(
+        { ...meetingData, userid: user?.id || meetingData.userid },
+        { allowDocuments: false },
+      );
+      const response = await api.post("/OnlineMeeting", submission, {
         withCredentials: true,
       });
       handelSnack(response?.data?.message ?? "Online meeting uploaded successfully.", "success");
-      setMeetingData(emptyMeeting);
+      setMeetingData({ ...emptyMeeting(), userid: user?.id || "" });
     } catch (err) {
       handelSnack(
         getErrorMessage(err, "Failed to upload meeting. Please try again."),
@@ -359,6 +743,9 @@ const Upload = () => {
       return;
     }
     if (!validateTextLimits(assignmentData, handelSnack)) {
+      return;
+    }
+    if (!validateContentFields(assignmentData, handelSnack)) {
       return;
     }
 
@@ -383,12 +770,13 @@ const Upload = () => {
     setLoading(true);
 
     try {
-      const payload = preparePayload(assignmentData);
-      const response = await api.post(`/assignment/${userId}`, payload, {
+      const submission = buildSubmissionData({ ...assignmentData, userid: user?.id || assignmentData.userid });
+      const response = await api.post(`/assignment/${userId}`, submission, {
         withCredentials: true,
       });
+      await uploadFilesToStorage(response, assignmentData.UploadFiles);
       handelSnack(response?.data?.message ?? "Assignment uploaded successfully.", "success");
-      setAssignmentData(emptyAssignment);
+      setAssignmentData({ ...emptyAssignment(), userid: user?.id || "" });
     } catch (err) {
       handelSnack(
         getErrorMessage(err, "Failed to upload assignment. Please try again."),
@@ -402,12 +790,6 @@ const Upload = () => {
   if (authLoading || !user || user.role === "student") {
     return null;
   }
-
-  const inputClass =
-    "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
-  const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
-  const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
-  const fieldStyle = { borderColor: "var(--color-border-primary)" };
 
   const renderSubjects = (id, value, onChange) => (
     <select id={id} name="subject" value={value} onChange={onChange} className={selectClass} style={fieldStyle} required>
@@ -498,6 +880,64 @@ const Upload = () => {
     );
   };
 
+  // file inputs are triggered by id from click handlers (avoids ref access during render)
+
+  const setContentType = (setter, type) => {
+    setter((prev) => ({
+      ...prev,
+      UploadContentType: type,
+      UploadLink: type === "link" ? (prev.UploadLink ?? "") : null,
+      UploadText: type === "text" ? (prev.UploadText ?? "") : null,
+      UploadFiles: type === "documents" ? (prev.UploadFiles ?? null) : null,
+    }));
+  };
+
+  const handleFileSelection = (setter, e, { append = false } = {}) => {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (selected.length === 0) return;
+
+    setter((prev) => {
+      const currentFiles = Array.isArray(prev.UploadFiles) ? prev.UploadFiles : [];
+      const baseFiles = append ? currentFiles : [];
+      const oversized = selected.find((file) => file.size > MAX_FILE_SIZE);
+      if (oversized) {
+        handelSnack(
+          `"${oversized.name}" is ${formatFileSize(oversized.size)}, which is over the ${MAX_FILE_SIZE_LABEL} limit. Please choose a smaller file.`,
+          "warn",
+        );
+        return prev;
+      }
+      const nextFiles = [...baseFiles, ...selected];
+      const totalSize = getFilesTotalSize(nextFiles);
+      if (totalSize > MAX_FILE_SIZE) {
+        handelSnack(
+          `Total file size cannot exceed ${MAX_FILE_SIZE_LABEL} per upload.`,
+          "warn",
+        );
+        return prev;
+      }
+      return { ...prev, UploadFiles: nextFiles, UploadContentType: "documents" };
+    });
+  };
+
+  const handleRemoveFile = (setter, index) => {
+    setter((prev) => {
+      const currentFiles = Array.isArray(prev.UploadFiles) ? prev.UploadFiles : [];
+      const nextFiles = currentFiles.filter((_, i) => i !== index);
+      return { ...prev, UploadFiles: nextFiles.length > 0 ? nextFiles : null };
+    });
+  };
+
+  const handleAddMoreFiles = (idPrefix, files, disabled) => {
+    if (disabled) return;
+    if (getFilesTotalSize(files) >= MAX_FILE_SIZE) {
+      handelSnack("Size cannot exceed the maximum size of upload per time.", "warn");
+      return;
+    }
+    document.getElementById(`${idPrefix}-upload-files-add`)?.click();
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center sm:text-left">
@@ -542,22 +982,7 @@ const Upload = () => {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="lesson-link" className={labelClass}>
-                    Link <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="lesson-link"
-                    name="link"
-                    type="url"
-                    value={lessonData.link}
-                    onChange={handleLessonChange}
-                    placeholder="https://example.com/lesson"
-                    className={inputClass}
-                    style={fieldStyle}
-                    required
-                  />
-                </div>
+                <ContentSection data={lessonData} setter={setLessonData} idPrefix="lesson" disabled={isGuest} onSetContentType={setContentType} onFileSelection={handleFileSelection} onRemoveFile={handleRemoveFile} onAddMoreFiles={handleAddMoreFiles} />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
@@ -689,6 +1114,8 @@ const Upload = () => {
                   />
                 </div>
 
+                <ContentSection data={quizData} setter={setQuizData} idPrefix="quiz" disabled={isGuest} onSetContentType={setContentType} onFileSelection={handleFileSelection} onRemoveFile={handleRemoveFile} onAddMoreFiles={handleAddMoreFiles} />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label htmlFor="quiz-faculty" className={labelClass}>
@@ -810,6 +1237,8 @@ const Upload = () => {
                   />
                 </div>
 
+                <ContentSection data={meetingData} setter={setMeetingData} idPrefix="meeting" disabled={isGuest} allowedTypes={MEETING_CONTENT_TYPES} onSetContentType={setContentType} onFileSelection={handleFileSelection} onRemoveFile={handleRemoveFile} onAddMoreFiles={handleAddMoreFiles} />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label htmlFor="meeting-faculty" className={labelClass}>
@@ -930,6 +1359,8 @@ const Upload = () => {
                     required
                   />
                 </div>
+
+                <ContentSection data={assignmentData} setter={setAssignmentData} idPrefix="assignment" disabled={isGuest} onSetContentType={setContentType} onFileSelection={handleFileSelection} onRemoveFile={handleRemoveFile} onAddMoreFiles={handleAddMoreFiles} />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>

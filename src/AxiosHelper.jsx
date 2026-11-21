@@ -64,6 +64,12 @@ api.interceptors.request.use((config) => {
   } catch (e) {
     // ignore
   }
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers = config.headers || {};
+    // Let the browser/axios set the multipart boundary automatically.
+    delete config.headers["Content-Type"];
+    delete config.headers["content-type"];
+  }
   return config;
 });
 

@@ -1,8 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
 import { useSnack } from "./SnackBarContext.jsx";
+
+const getErrorMessage = (err, fallback) => {
+  const data = err?.response?.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (typeof err?.plainMessage === "string" && err.plainMessage.trim())
+    return err.plainMessage.trim();
+  if (typeof err?.message === "string" && err.message.trim()) return err.message.trim();
+  if (data && typeof data === "object") {
+    const direct = data.message ?? data.error ?? data.msg ?? data.title ?? data.detail;
+    if (typeof direct === "string" && direct.trim()) return direct.trim();
+    if (data.errors && typeof data.errors === "object") {
+      const first = Object.values(data.errors).flat().find((item) => item);
+      if (first) return String(first);
+    }
+  }
+  if (err?.code === "ERR_NETWORK" || (!err?.response && err?.request)) {
+    return "Network error. Please check your connection and try again.";
+  }
+  return fallback;
+};
 
 const ProfilePage = () => {
   const { user, updateUser, isGuest } = useAuth();
@@ -12,12 +32,7 @@ const ProfilePage = () => {
   const [isEditingPhone, setIsEditingPhone] = useState(!user?.phone);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { 
-    if (user) {
-      setPhone(user.phone || "");
-      setIsEditingPhone(!user.phone);
-    }
-  }, [user]);
+  // Phone form state is reset by remounting the profile card when user identity/phone changes.
 
   const handlePhoneSave = async () => {
     if (isGuest) return;
@@ -28,9 +43,10 @@ const ProfilePage = () => {
 
     setLoading(true);
     try {
+      
       const res = await api.post(
         `/Student/phone/${user.id}`,
-        { phone },
+        phone,
         {
           headers: {
             "Content-Type": "application/json",
@@ -42,11 +58,14 @@ const ProfilePage = () => {
       updateUser({ phone: savedPhone });
       setPhone(savedPhone);
       setIsEditingPhone(false);
-      ShowSnackBar("Phone number updated successfully.", "success");
+      const successMsg =
+        (typeof res?.data === "string" ? res.data : null) ||
+        res?.data?.message ||
+        res?.message ||
+        "Phone number updated successfully.";
+      ShowSnackBar(successMsg, "success");
     } catch (err) {
-      const serverMsg =
-        err?.response?.data?.message ?? err?.response?.data?.error ?? null;
-      ShowSnackBar(serverMsg || "Failed to update phone number.", "error");
+      ShowSnackBar(getErrorMessage(err, "Failed to update phone number."), "error");
     } finally {
       setLoading(false);
     }
@@ -68,16 +87,21 @@ const ProfilePage = () => {
     );
   }
 
+  const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== "";
+
+  const nameValue = user.username ?? user.name;
+  const groupValue = user.group ?? user.Group;
+
   const fields = [
-    { label: "Name", value: user.username || user.name || "-" },
-    { label: "Email", value: user.email || "-" },
-    { label: "Role", value: user.role || "-" },
-    { label: "Code", value: user.code || "-" },
-    { label: "Faculty", value: user.faculty || "-" },
-    { label: "Division", value: user.division || "-" },
-    { label: "Group", value: user.group || user.Group || "-" },
-    { label: "Password" },
-  ];
+    { label: "Name", value: nameValue, visible: hasValue(nameValue) },
+    { label: "Email", value: user.email, visible: hasValue(user.email) },
+    { label: "Role", value: user.role, visible: hasValue(user.role) },
+    { label: "Code", value: user.code, visible: hasValue(user.code) },
+    { label: "Faculty", value: user.faculty, visible: hasValue(user.faculty) },
+    { label: "Division", value: user.division, visible: hasValue(user.division) },
+    { label: "Group", value: groupValue, visible: hasValue(groupValue) },
+    { label: "Password", visible: true },
+  ].filter((field) => field.visible);
 
   return (
     <div className="space-y-6">
@@ -91,6 +115,7 @@ const ProfilePage = () => {
       </div>
 
       <div
+        key={user ? `${user.id ?? "user"}-${user.phone ?? ""}` : "nouser"}
         className="max-w-3xl mx-auto w-full bg-white border rounded-2xl p-6 sm:p-8 space-y-4"
         style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
       >

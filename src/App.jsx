@@ -14,6 +14,7 @@ import AllAssignmentsPage from "./AllAssignmentsPage";
 import QuizDetailsPage from "./QuizDetailsPage";
 import MeetingDetailsPage from "./MeetingDetailsPage";
 import AssignmentDetailsPage from "./AssignmentDetailsPage";
+import LessonDetailsPage from "./LessonDetailsPage";
 import QuizEditPage from "./QuizEditPage";
 import MeetingEditPage from "./MeetingEditPage";
 import AssignmentEditPage from "./AssignmentEditPage";
@@ -156,6 +157,14 @@ const AppContent = () => {
                 element={
                   <ProtectedRoute>
                     <MeetingDetailsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/lesson/:id"
+                element={
+                  <ProtectedRoute>
+                    <LessonDetailsPage />
                   </ProtectedRoute>
                 }
               />
