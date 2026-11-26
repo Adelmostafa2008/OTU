@@ -4,6 +4,17 @@ import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
 import { useSnack } from "./SnackBarContext.jsx";
 import { FormSkeleton } from "./Skeleton";
+import ContentSection from "./ContentSection.jsx";
+import {
+  MAX_FILE_SIZE,
+  MAX_FILE_SIZE_LABEL,
+  buildContentPayload,
+  formatFileSize,
+  getFilesTotalSize,
+  isSavedDoc,
+  pickField,
+  toSavedDocs,
+} from "./contentUtils.js";
 import axios from "axios";
 
 const s3Client = axios.create();
@@ -38,131 +49,155 @@ const YEARS = ["1", "2", "3", "4"];
 const SEMESTERS = ["first", "second"];
 
 const CONTENT_TYPES = ["link", "text", "documents"];
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const MAX_FILE_SIZE_LABEL = "50MB";
-const OPTIONAL_FIELDS = ["notes", "description", "UploadLink", "UploadText"];
 
-const normalizeContentData = (data = {}) => {
-  const rawDocs = Array.isArray(data.docs)
-    ? data.docs
-    : Array.isArray(data.UploadFiles)
-      ? data.UploadFiles
-      : null;
-  const declared = String(data.UploadContentType || "").trim().toLowerCase();
-  // UploadContentType holds the selected tab, but older records may hold a MIME
-  // type or nothing, so fall back to the docs/text/link content.
-  const type = CONTENT_TYPES.includes(declared)
-    ? declared
-    : rawDocs && rawDocs.length > 0
-      ? "documents"
-      : data.UploadText || data.text
-        ? "text"
-        : "link";
+const inputClass =
+  "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
+const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
+const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
+const fieldStyle = { borderColor: "var(--color-border-primary)" };
 
-  return {
-    ...data,
-    UploadContentType: type,
-    UploadLink: type === "link" ? (data.UploadLink ?? data.link ?? "") : null,
-    UploadText: type === "text" ? (data.UploadText ?? data.text ?? "") : null,
-    UploadFiles: type === "documents" ? rawDocs : null,
-  };
-};
+const emptyQuizEdit = () => ({
+  title: "",
+  faculty: "",
+  division: "",
+  subject: "",
+  year: "",
+  semester: "",
+  notes: "",
+  QuizDate: "",
+  userid: "",
+  UploadContentType: "link",
+  UploadLink: "",
+  UploadText: "",
+  UploadFiles: [],
+});
 
-const preparePayload = (data) => {
-  const payload = {};
-  Object.entries(data).forEach(([key, value]) => {
-    if (value === null || value === undefined) return;
-    if (Array.isArray(value)) {
-      payload[key] = value;
-      return;
+// The quiz endpoint answers with these properties:
+//   id, Faculty, Division, Subject, Year, semester, title
+//   QuizDate?, link?, text?, notes?, files?
+// The casing is not consistent (`faculty`/`Faculty`, `uploadContentType`/
+// `UploadContentType`), so each one is read through `pickField`. Anything
+// marked with ? may arrive as null, so every value is read through `asText` to
+// keep the form state as plain, controlled strings.
+const asText = (value) => (value === null || value === undefined ? "" : String(value));
+
+const getUserId = (user) =>
+  user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
+
+const getErrorMessage = (err, fallback) => {
+  const data = err?.response?.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (data && typeof data === "object") {
+    const direct = data.message ?? data.error ?? data.msg ?? data.title ?? data.detail;
+    if (typeof direct === "string" && direct.trim()) return direct.trim();
+    if (data.errors && typeof data.errors === "object") {
+      const first = Object.values(data.errors).flat().find((item) => item);
+      if (first) return String(first);
     }
-    if (typeof value !== "string") {
-      payload[key] = value;
-      return;
-    }
-    const cleaned = value.trim();
-    if (cleaned === "" && OPTIONAL_FIELDS.includes(key)) return;
-    payload[key] = cleaned;
-  });
-  return payload;
+  }
+  if (err?.code === "ERR_NETWORK" || (!err?.response && err?.request)) {
+    return "Network error. Please check your connection and try again.";
+  }
+  return fallback;
 };
 
-// Files are never sent to the API. Only a light descriptor is sent (the actual
-// bytes go to the cloud storage separately), matching the server `docs` DTO.
-const toDocDescriptor = (file) => {
-  if (!file) return null;
-  const isFile = typeof File !== "undefined" && file instanceof File;
-  const filename = isFile ? file.name : file.filename ?? file.name ?? "";
-  const size = isFile ? file.size : Number(file.size ?? 0);
-  const contentType = isFile
-    ? file.type || "application/octet-stream"
-    : file.content_type ?? file.contentType ?? "application/octet-stream";
-
-  return {
-    filename: String(filename),
-    size: Number.isFinite(size) ? size : 0,
-    content_type: String(contentType),
-  };
+// The endpoint labels the documents tab "document" (singular), while the form
+// and ContentSection use "documents" internally. Both spellings are accepted.
+const normalizeContentTab = (value) => {
+  const declared = asText(value).trim().toLowerCase();
+  if (declared === "document" || declared === "documents") return "documents";
+  if (declared === "text") return "text";
+  if (declared === "link") return "link";
+  return "";
 };
 
-const buildDocs = (files) =>
-  (Array.isArray(files) ? files : []).map(toDocDescriptor).filter(Boolean);
+const isFileObject = (file) => typeof File !== "undefined" && file instanceof File;
 
-const formatFileSize = (bytes) => {
-  const size = Number(bytes) || 0;
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+const getNewFiles = (files) =>
+  (Array.isArray(files) ? files : []).filter((file) => isFileObject(file));
+
+const getSavedKeys = (files) =>
+  (Array.isArray(files) ? files : [])
+    .filter((file) => isSavedDoc(file) && !isFileObject(file))
+    .map((file) => String(file.key ?? ""))
+    .filter(Boolean);
+
+const toDateValue = (date) => {
+  if (!(date instanceof Date) || isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
-const getFilesTotalSize = (files) =>
-  (Array.isArray(files) ? files : []).reduce((sum, file) => {
-    const size = file instanceof File ? file.size : Number(file?.size ?? 0);
-    return sum + (Number.isFinite(size) ? size : 0);
-  }, 0);
+// The quiz date is date-only: the endpoint may send an ISO timestamp, a naive
+// `YYYY-MM-DD HH:mm:ss` string or a plain date, and all of them end up in the
+// `YYYY-MM-DD` shape the date input expects.
+const toQuizDateValue = (raw) => {
+  if (raw === null || raw === undefined) return "";
+  if (raw instanceof Date) return toDateValue(raw);
 
-// Builds the plain JSON body the API expects. Only the properties of the
-// selected content tab get a value; the rest are sent as null.
-const buildSubmissionData = (data, { allowDocuments = true } = {}) => {
-  const { UploadFiles, ...rest } = data;
-  const payload = preparePayload(rest);
+  const trimmed = String(raw).trim();
+  if (!trimmed) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (trimmed.includes("T")) return trimmed.split("T")[0];
+  if (trimmed.includes(" ")) return trimmed.split(" ")[0];
 
-  const type = !allowDocuments
-    ? data.UploadContentType === "text"
-      ? "text"
-      : "link"
-    : data.UploadContentType || "link";
+  return toDateValue(new Date(trimmed));
+};
 
-  const docs = allowDocuments && type === "documents" ? buildDocs(UploadFiles) : null;
+const normalizeQuiz = (raw) => {
+  const source = raw ?? {};
 
-  payload.UploadLink = type === "link" ? String(data.UploadLink ?? "").trim() : null;
-  payload.UploadText = type === "text" ? String(data.UploadText ?? "").trim() : null;
+  const files = toSavedDocs(pickField(source, "files", "docs", "UploadFiles"));
+  const link = asText(pickField(source, "link", "UploadLink"));
+  const text = asText(pickField(source, "text", "UploadText"));
+  const declared = normalizeContentTab(
+    pickField(source, "UploadContentType", "uploadContentType", "upload_content_type"),
+  );
 
-  // UploadContentType names the selected tab: "link", "text" or "documents".
-  payload.UploadContentType = type;
-
-  if (allowDocuments) {
-    payload.docs = docs;
+  // UploadContentType is nullable, so when it is missing/empty the tab is
+  // derived from the content the quiz actually carries (files, then text).
+  let contentType;
+  if (CONTENT_TYPES.includes(declared)) {
+    contentType = declared;
+  } else if (files.length > 0) {
+    contentType = "documents";
+  } else if (text.trim()) {
+    contentType = "text";
   } else {
-    delete payload.docs;
-    delete payload.UploadFiles;
+    contentType = "link";
   }
 
-  return payload;
+  const semester = asText(pickField(source, "semester")).trim().toLowerCase();
+
+  return {
+    title: asText(pickField(source, "title")),
+    faculty: asText(pickField(source, "faculty")),
+    division: asText(pickField(source, "division")),
+    subject: asText(pickField(source, "subject")),
+    year: asText(pickField(source, "year")),
+    semester: SEMESTERS.includes(semester) ? semester : "",
+    notes: asText(pickField(source, "notes", "description")),
+    QuizDate: toQuizDateValue(
+      pickField(source, "QuizDate", "quizDate", "quiz_date", "date", "startDate"),
+    ),
+    userid: asText(pickField(source, "userid", "userId", "UploaderId")),
+    UploadContentType: contentType,
+    UploadLink: link,
+    UploadText: text,
+    UploadFiles: files,
+  };
 };
 
-// After the API saves the record it answers with one presigned URL per file.
-// The bytes are then put straight into the cloud storage, exactly like the
-// lesson tab does it. Non-file entries (already saved descriptors) are skipped.
-const uploadDocsToStorage = async (response, files) => {
+const uploadFilesToStorage = async (response, files) => {
   if (!Array.isArray(response?.data)) return;
   const list = Array.isArray(files) ? files : [];
 
   await Promise.all(
     response.data.map(async (item, index) => {
       const file = list[index];
-      if (!file || !(file instanceof File)) return;
+      if (!file || !isFileObject(file)) return;
 
       await s3Client.put(item.url, file, {
         headers: {
@@ -177,145 +212,309 @@ const QuizEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isGuest } = useAuth();
+  const { user, loading: authLoading, isGuest } = useAuth();
   const { ShowSnackBar } = useSnack();
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(!location.state?.quiz);
+  const [cool, setCool] = useState(false);
 
-  const [formData, setFormData] = useState(normalizeContentData(location.state?.quiz || {}));
-  const [initialData, setInitialData] = useState(normalizeContentData(location.state?.quiz || {}));
+  const handelSnack = (msg, ty) => {
+    if (!cool) {
+      setCool(true);
+      ShowSnackBar(msg, ty);
+      setTimeout(() => {
+        setCool(false);
+      }, 5000);
+    }
+  };
+
+  // The route id is authoritative, but the payload's own `id` is used as a
+  // fallback so deep links/state hydration still address the right quiz.
+  const [quizId, setQuizId] = useState(id ?? location.state?.quiz?.id ?? "");
+
+  const [formData, setFormData] = useState(() =>
+    location.state?.quiz
+      ? { ...normalizeQuiz(location.state.quiz), userid: getUserId(user) }
+      : { ...emptyQuizEdit(), userid: getUserId(user) },
+  );
+  // Keys of already saved documents the user removed (directly or by leaving
+  // the documents tab). Nothing is sent until the user presses save.
+  const [deletedKeys, setDeletedKeys] = useState([]);
+  const [fetching, setFetching] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate("/login", { replace: true });
       return;
     }
     if (user.role !== "admin" && user.role !== "instructor") {
       navigate("/", { replace: true });
-      return;
     }
+  }, [user, authLoading, navigate]);
 
-    const fetchData = async () => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchQuiz = async () => {
       setFetching(true);
       try {
-        const userId =
-          user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
-        const response = await api.get(`/Student/quiz/single/${id}?user_id=${userId}`);
+        const userId = getUserId(user);
+        const response = await api.get(`/Student/quiz/single/edit/${quizId}?user_id=${userId}`);
+        console.log(response.data);
+        
+        if (cancelled) return;
         if (response?.data) {
-          const normalized = normalizeContentData(response.data);
-          setFormData(normalized);
-          setInitialData(normalized);
-        } else {
-          setFormData(normalizeContentData({}));
-          setInitialData(normalizeContentData({}));
+          if (
+            response.data.id !== null &&
+            response.data.id !== undefined &&
+            String(response.data.id) !== String(quizId)
+          ) {
+            setQuizId(response.data.id);
+          }
+          setFormData((prev) => ({
+            ...normalizeQuiz(response.data),
+            userid: prev.userid || getUserId(user),
+          }));
+          setDeletedKeys([]);
         }
       } catch (err) {
-        setFormData(normalizeContentData({}));
-        setInitialData(normalizeContentData({}));
+        if (cancelled) return;
+        if (!location.state?.quiz) {
+          handelSnack(getErrorMessage(err, "Failed to load quiz."), "error");
+        }
       } finally {
-        setFetching(false);
+        if (!cancelled) setFetching(false);
       }
     };
 
-    if (!location.state?.quiz) {
-      fetchData();
-    } else {
-      const normalized = normalizeContentData(location.state?.quiz || {});
-      setFormData(normalized);
-      setInitialData(normalized);
-    }
-  }, [user, navigate, id, location.state]);
+    fetchQuiz();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizId, user?.id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     let nextValue = value;
-    if (name === "title" && typeof value === "string") {
-      nextValue = value.slice(0, 100);
-    } else if (name === "notes" && typeof value === "string") {
-      nextValue = value.slice(0, 400);
-    }
+    if (name === "title") nextValue = value.slice(0, 100);
+    if (name === "notes") nextValue = value.slice(0, 400);
+
     setFormData((prev) => {
       const next = { ...prev, [name]: nextValue };
-      if (name === "faculty") {
-        next.division = "";
-      }
+      if (name === "faculty") next.division = "";
       return next;
     });
   };
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (isGuest) return;
-    if (!formData.title?.trim()) {
-      ShowSnackBar("Title is required.", "warn");
-      return;
+
+  // Switching tabs is intent only: leaving "documents" queues the keys of every
+  // saved document still on screen, but the documents stay selected so coming
+  // back to the tab shows them again (and un-queues those keys).
+  const handleSetContentType = (_setter, nextType) => {
+    const currentType = formData.UploadContentType || "link";
+    if (currentType === nextType) return;
+
+    if (currentType === "documents") {
+      const keys = getSavedKeys(formData.UploadFiles);
+      if (keys.length > 0) {
+        setDeletedKeys((prev) => Array.from(new Set([...prev, ...keys])));
+      }
+    } else if (nextType === "documents") {
+      const visible = new Set(getSavedKeys(formData.UploadFiles));
+      setDeletedKeys((prev) => prev.filter((key) => !visible.has(key)));
     }
-    if (String(formData.title ?? "").length > 100) {
-      ShowSnackBar("Title must be at most 100 characters.", "warn");
-      return;
-    }
-    const notesVal = formData.notes || formData.description || "";
-    if (notesVal && String(notesVal).length > 400) {
-      ShowSnackBar("Notes must be at most 400 characters.", "warn");
-      return;
-    }
-    const contentType = formData.UploadContentType || "link";
-    if (contentType === "link" && !String(formData.UploadLink || "").trim()) {
-      ShowSnackBar("Please provide a link.", "warn");
-      return;
-    }
-    if (contentType === "text" && !String(formData.UploadText || "").trim()) {
-      ShowSnackBar("Please provide text content.", "warn");
-      return;
-    }
-    if (contentType === "documents" && (!Array.isArray(formData.UploadFiles) || formData.UploadFiles.length === 0)) {
-      ShowSnackBar("Please select at least one document.", "warn");
-      return;
-    }
-    if (contentType === "documents") {
-      const docsTotalSize = getFilesTotalSize(formData.UploadFiles);
-      if (docsTotalSize > MAX_FILE_SIZE) {
-        ShowSnackBar(`Total file size cannot exceed ${MAX_FILE_SIZE_LABEL} per upload.`, "warn");
+
+    setFormData((prev) => ({ ...prev, UploadContentType: nextType }));
+  };
+
+  const handleFileSelection = (_setter, e, { append = false } = {}) => {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (selected.length === 0) return;
+
+    setFormData((prev) => {
+      const currentFiles = Array.isArray(prev.UploadFiles) ? prev.UploadFiles : [];
+      const baseFiles = append ? currentFiles : [];
+      const oversized = selected.find((file) => file.size > MAX_FILE_SIZE);
+      if (oversized) {
+        handelSnack(
+          `"${oversized.name}" is ${formatFileSize(oversized.size)}, which is over the ${MAX_FILE_SIZE_LABEL} limit. Please choose a smaller file.`,
+          "warn",
+        );
+        return prev;
+      }
+      const nextFiles = [...baseFiles, ...selected];
+      if (getFilesTotalSize(nextFiles) > MAX_FILE_SIZE) {
+        handelSnack(
+          `Total file size cannot exceed ${MAX_FILE_SIZE_LABEL} per upload.`,
+          "warn",
+        );
+        return prev;
+      }
+      return { ...prev, UploadFiles: nextFiles, UploadContentType: "documents" };
+    });
+  };
+
+  const handleRemoveFile = (_setter, index) => {
+    const currentFiles = Array.isArray(formData.UploadFiles) ? formData.UploadFiles : [];
+    const target = currentFiles[index];
+
+    // Only already saved documents have a key to delete on the server.
+    if (isSavedDoc(target) && !isFileObject(target)) {
+      if (target.key) {
+        setDeletedKeys((prev) =>
+          prev.includes(target.key) ? prev : [...prev, String(target.key)],
+        );
+      } else {
+        // The endpoint deletes by key, so a descriptor without one cannot be
+        // removed server-side; say so rather than pretending it was saved.
+        handelSnack(
+          `"${target.filename || "This document"}" cannot be removed because the server did not provide its key.`,
+          "warn",
+        );
         return;
       }
     }
 
-    const dateVal = getQuizDateValue();
-    if (dateVal) {
-      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateVal);
-      if (match) {
-        const selectedDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (selectedDate < today) {
-          ShowSnackBar("Please select today or a future date for the quiz.", "warn");
-          return;
-        }
+    setFormData((prev) => {
+      const files = Array.isArray(prev.UploadFiles) ? prev.UploadFiles : [];
+      return { ...prev, UploadFiles: files.filter((_, i) => i !== index) };
+    });
+  };
+
+  const handleAddMoreFiles = (idPrefix, files, disabled) => {
+    if (disabled) return;
+    if (getFilesTotalSize(files) >= MAX_FILE_SIZE) {
+      handelSnack("Size cannot exceed the maximum size of upload per time.", "warn");
+      return;
+    }
+    document.getElementById(`${idPrefix}-upload-files-add`)?.click();
+  };
+
+  const newFiles = getNewFiles(formData.UploadFiles);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (saving || isGuest) return;
+
+    const required = ["title", "subject", "faculty", "division", "year", "semester", "QuizDate"];
+    const labels = {
+      title: "Title",
+      subject: "Subject",
+      faculty: "Faculty",
+      division: "Division",
+      year: "Year",
+      semester: "Semester",
+      QuizDate: "Quiz Date",
+    };
+    const missing = required
+      .filter((field) => !String(formData[field] ?? "").trim())
+      .map((field) => labels[field]);
+    if (missing.length > 0) {
+      handelSnack(`Please fill in: ${missing.join(", ")}.`, "warn");
+      return;
+    }
+    if (String(formData.title ?? "").length > 100) {
+      handelSnack("Title must be at most 100 characters.", "warn");
+      return;
+    }
+    if (String(formData.notes ?? "").length > 400) {
+      handelSnack("Notes must be at most 400 characters.", "warn");
+      return;
+    }
+
+    const quizDateValue = String(formData.QuizDate ?? "");
+    const selectedDate = new Date(`${quizDateValue}T00:00:00`);
+    if (!isNaN(selectedDate.getTime())) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      if (selectedDate < todayStart) {
+        handelSnack("Please select today or a future date for the quiz.", "warn");
+        return;
       }
     }
 
-    setLoading(true);
+    const contentType = formData.UploadContentType || "link";
+    if (contentType === "link" && !String(formData.UploadLink ?? "").trim()) {
+      handelSnack("Please provide a link.", "warn");
+      return;
+    }
+    if (contentType === "text" && !String(formData.UploadText ?? "").trim()) {
+      handelSnack("Please provide text content.", "warn");
+      return;
+    }
+    // The documents tab keeps already saved attachments in UploadFiles next to
+    // the newly chosen ones, so any entry means the tab has content.
+    if (
+      contentType === "documents" &&
+      (!Array.isArray(formData.UploadFiles) || formData.UploadFiles.length === 0)
+    ) {
+      handelSnack("Please select at least one document.", "warn");
+      return;
+    }
+    if (getFilesTotalSize(newFiles) > MAX_FILE_SIZE) {
+      handelSnack(`Total file size cannot exceed ${MAX_FILE_SIZE_LABEL} per upload.`, "warn");
+      return;
+    }
+
+    setSaving(true);
+
     try {
-      const submission = buildSubmissionData(formData);
-      if (dateVal) {
-        submission.QuizDate = dateVal;
-        submission.quizDate = dateVal;
-        submission.date = dateVal;
+      const userId = getUserId(user);
+      // New documents only belong to the quiz while the documents tab is the
+      // active content; hidden files from a previous tab are never uploaded.
+      const docsToAdd = formData.UploadContentType === "documents" ? newFiles : [];
+      const submission = buildContentPayload(
+        {
+          ...formData,
+          userid: userId || formData.userid,
+          QuizDate: formData.QuizDate,
+          UploadFiles: docsToAdd,
+        },
+        { dateField: "QuizDate" },
+      );
+
+      // 1. Removed documents go first (the only request that takes key strings).
+      console.log(deletedKeys);
+      
+      if (deletedKeys.length > 0) {
+        await api.put(`/Quizzes/deletefiles/${quizId}`, deletedKeys, {
+          withCredentials: true,
+        });
       }
-      const response = await api.put(`/Quizzes/${id}`, submission, {
+
+      // 2. New documents are registered and then pushed to cloud storage.
+      if (docsToAdd.length > 0) {
+        const addResponse = await api.put(`/Quizzes/addfiles/${quizId}`, submission, {
+          withCredentials: true,
+        });
+        await uploadFilesToStorage(addResponse, docsToAdd);
+      }
+
+      // 3. Finally the quiz fields themselves are updated. The add/delete
+      // endpoints own the document list, so the quiz update never carries it:
+      // sending only the newly added files here would replace the saved
+      // attachments instead of appending to them.
+      const updatePayload = { ...submission };
+      delete updatePayload.docs;
+
+      const response = await api.put(`/Quizzes/${quizId}`, updatePayload, {
         withCredentials: true,
       });
-      await uploadDocsToStorage(response, formData.UploadFiles);
-      ShowSnackBar("Quiz updated successfully.", "success");
-      navigate(`/quiz/${id}`, { state: { quiz: { ...formData, ...(dateVal ? { QuizDate: dateVal } : {}) } } });
+
+      handelSnack(response?.data?.message ?? "Quiz updated successfully.", "success");
+      navigate(`/quiz/${quizId}`);
     } catch (err) {
-      const serverMsg =
-        err?.response?.data?.message ?? err?.response?.data?.error ?? null;
-      ShowSnackBar(serverMsg || "Failed to update quiz.", "error");
+      handelSnack(
+        getErrorMessage(err, "Failed to update quiz. Please try again."),
+        "error",
+      );
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (!user || (user.role !== "admin" && user.role !== "instructor")) {
+  if (authLoading || !user || (user.role !== "admin" && user.role !== "instructor")) {
     return null;
   }
 
@@ -323,14 +522,17 @@ const QuizEditPage = () => {
     return <FormSkeleton />;
   }
 
-  const inputClass =
-    "w-full rounded-xl border bg-white px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
-  const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
-  const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
-  const fieldStyle = { borderColor: "var(--color-border-primary)" };
-
   const renderSubjects = (id, value) => (
-    <select disabled={isGuest} id={id} name="subject" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
+    <select
+      id={id}
+      name="subject"
+      value={value}
+      onChange={handleChange}
+      className={selectClass}
+      style={fieldStyle}
+      disabled={isGuest}
+      required
+    >
       <option value="">Select subject</option>
       {SUBJECTS.map((option) => (
         <option key={option} value={option}>
@@ -341,7 +543,16 @@ const QuizEditPage = () => {
   );
 
   const renderFaculties = (id, value) => (
-    <select disabled={isGuest} id={id} name="faculty" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
+    <select
+      id={id}
+      name="faculty"
+      value={value}
+      onChange={handleChange}
+      className={selectClass}
+      style={fieldStyle}
+      disabled={isGuest}
+      required
+    >
       <option value="">Select faculty</option>
       {FACULTIES.map((option) => (
         <option key={option} value={option}>
@@ -354,14 +565,14 @@ const QuizEditPage = () => {
   const renderDivisions = (id, faculty, value) => {
     const options = DIVISIONS_BY_FACULTY[faculty] || [];
     return (
-      <select disabled={isGuest}
+      <select
         id={id}
         name="division"
-        value={value || ""}
+        value={value}
         onChange={handleChange}
         className={selectClass}
         style={fieldStyle}
-        disabled={options.length === 0}
+        disabled={isGuest || options.length === 0}
         required
       >
         <option value="">
@@ -377,7 +588,16 @@ const QuizEditPage = () => {
   };
 
   const renderYears = (id, value) => (
-    <select disabled={isGuest} id={id} name="year" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
+    <select
+      id={id}
+      name="year"
+      value={value}
+      onChange={handleChange}
+      className={selectClass}
+      style={fieldStyle}
+      disabled={isGuest}
+      required
+    >
       <option value="">Select year</option>
       {YEARS.map((option) => (
         <option key={option} value={option}>
@@ -388,7 +608,16 @@ const QuizEditPage = () => {
   );
 
   const renderSemesters = (id, value) => (
-    <select disabled={isGuest} id={id} name="semester" value={value || ""} onChange={handleChange} className={selectClass} style={fieldStyle} required>
+    <select
+      id={id}
+      name="semester"
+      value={value}
+      onChange={handleChange}
+      className={selectClass}
+      style={fieldStyle}
+      disabled={isGuest}
+      required
+    >
       <option value="">Select semester</option>
       {SEMESTERS.map((option) => (
         <option key={option} value={option}>
@@ -398,276 +627,23 @@ const QuizEditPage = () => {
     </select>
   );
 
-  const getQuizDateValue = () => {
-    const raw = formData.quizDate || formData.QuizDate || formData.date || formData.quiz_date || formData.startDate || "";
-    if (!raw) return "";
-    if (typeof raw === "string") {
-      if (raw.includes("T")) return raw.split("T")[0];
-      if (raw.includes(" ")) return raw.split(" ")[0];
-      if (raw.includes(".")) return raw.split(".")[0];
-      return raw;
-    }
-    try {
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) return "";
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    } catch {
-      return "";
-    }
-  };
-
-  const quizDateValue = getQuizDateValue();
-
-  const setContentType = (type) => {
-    setFormData((prev) => ({
-      ...prev,
-      UploadContentType: type,
-      UploadLink: type === "link" ? (prev.UploadLink ?? "") : null,
-      UploadText: type === "text" ? (prev.UploadText ?? "") : null,
-      UploadFiles: type === "documents" ? (prev.UploadFiles ?? null) : null,
-    }));
-  };
-
-  const handleFileSelection = (e, { append = false } = {}) => {
-    const selected = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (selected.length === 0) return;
-
-    setFormData((prev) => {
-      const currentFiles = Array.isArray(prev.UploadFiles) ? prev.UploadFiles : [];
-      const baseFiles = append ? currentFiles : [];
-      const oversized = selected.find((file) => file.size > MAX_FILE_SIZE);
-      if (oversized) {
-        ShowSnackBar(
-          `"${oversized.name}" is ${formatFileSize(oversized.size)}, which is over the ${MAX_FILE_SIZE_LABEL} limit. Please choose a smaller file.`,
-          "warn",
-        );
-        return prev;
-      }
-      const nextFiles = [...baseFiles, ...selected];
-      const totalSize = getFilesTotalSize(nextFiles);
-      if (totalSize > MAX_FILE_SIZE) {
-        ShowSnackBar(
-          `Total file size cannot exceed ${MAX_FILE_SIZE_LABEL} per upload.`,
-          "warn",
-        );
-        return prev;
-      }
-      return { ...prev, UploadFiles: nextFiles, UploadContentType: "documents" };
-    });
-  };
-
-  const handleRemoveFile = (index) => {
-    setFormData((prev) => {
-      const currentFiles = Array.isArray(prev.UploadFiles) ? prev.UploadFiles : [];
-      const nextFiles = currentFiles.filter((_, i) => i !== index);
-      return { ...prev, UploadFiles: nextFiles.length > 0 ? nextFiles : null };
-    });
-  };
-
-  const handleAddMoreFiles = (files, disabled) => {
-    if (disabled) return;
-    if (getFilesTotalSize(files) >= MAX_FILE_SIZE) {
-      ShowSnackBar("Size cannot exceed the maximum size of upload per time.", "warn");
-      return;
-    }
-    document.getElementById(`quiz-upload-files-add`)?.click();
-  };
-
-  const renderContentSection = () => {
-    const type = formData.UploadContentType || "link";
-    const tabBase = "px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors";
-    const activeStyle = { backgroundColor: "var(--color-brand-primary)", color: "#ffffff", borderColor: "var(--color-brand-primary)" };
-    const inactiveStyle = { borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" };
-    const files = Array.isArray(formData.UploadFiles) ? formData.UploadFiles : [];
-    return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {CONTENT_TYPES.map((option) => {
-            const active = type === option;
-            const label = option === "link" ? "Link" : option === "text" ? "Text" : "Documents";
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setContentType(option)}
-                className={`${tabBase} cursor-pointer`}
-                style={active ? activeStyle : inactiveStyle}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {type === "link" && (
-          <div>
-            <label htmlFor="quiz-upload-link" className={labelClass}>
-              Link <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="quiz-upload-link"
-              name="UploadLink"
-              type="url"
-              disabled={isGuest}
-              readOnly={isGuest}
-              value={formData.UploadLink || ""}
-              onChange={(e) => setFormData((prev) => ({ ...prev, UploadLink: e.target.value }))}
-              placeholder="https://example.com/resource"
-              className={inputClass}
-              style={fieldStyle}
-              required={!isGuest}
-            />
-          </div>
-        )}
-
-        {type === "text" && (
-          <div>
-            <label htmlFor="quiz-upload-text" className={labelClass}>
-              Text <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              id="quiz-upload-text"
-              name="UploadText"
-              disabled={isGuest}
-              readOnly={isGuest}
-              value={formData.UploadText || ""}
-              onChange={(e) => setFormData((prev) => ({ ...prev, UploadText: e.target.value }))}
-              placeholder="Enter text content..."
-              rows={6}
-              className={`${inputClass} resize-none overflow-y-auto`}
-              style={{ ...fieldStyle, minHeight: "160px" }}
-              required={!isGuest}
-            />
-          </div>
-        )}
-
-        {type === "documents" && (
-          <div>
-            <label className={labelClass}>
-              Documents <span className="text-red-500">*</span>
-            </label>
-            <div
-              className="w-full rounded-2xl border-2 border-dashed p-5 sm:p-6 flex flex-col items-stretch text-center bg-gray-50/60"
-              style={{ borderColor: "var(--color-border-primary)" }}
-            >
-              <div className="flex flex-col items-center justify-center">
-                <input id={`quiz-upload-files`} type="file" multiple className="hidden" disabled={isGuest} onChange={(e) => handleFileSelection(e)} />
-                <input id={`quiz-upload-files-add`} type="file" multiple className="hidden" disabled={isGuest} onChange={(e) => handleFileSelection(e, { append: true })} />
-                {files.length === 0 && (
-                  <>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: "rgba(0,0,0,0.04)", color: "var(--color-brand-primary)" }} aria-hidden="true">
-                    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 16V4" /><path d="M7 9l5-5 5 5" /><path d="M4 20h16" />
-                    </svg>
-                  </div>
-                  <button type="button" disabled={isGuest} onClick={(e) => { if (isGuest) { e.preventDefault(); e.stopPropagation(); return; } document.getElementById(`quiz-upload-files`)?.click(); }} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${isGuest ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`} style={{ backgroundColor: "var(--color-brand-primary)" }}>Browse</button>
-                  <p className="m-0 mt-2 text-xs text-gray-500">Maximum total size {MAX_FILE_SIZE_LABEL}</p>
-                  </>
-                )}
-              </div>
-
-              {files.length > 0 && (() => {
-                const totalSize = getFilesTotalSize(files);
-                const atLimit = totalSize >= MAX_FILE_SIZE;
-                return (
-                  <div className="w-full text-left rounded-2xl border bg-white p-4 sm:p-5" style={{ borderColor: "var(--color-border-primary)" }}>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
-                        <svg viewBox="0 0 20 20" className="w-5 h-5" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                        {files.length} file{files.length > 1 ? "s" : ""} selected
-                      </div>
-                      <div className="text-xs sm:text-sm font-medium text-gray-600">
-                        Total: <span className={totalSize > MAX_FILE_SIZE ? "text-red-600 font-semibold" : "text-gray-900 font-semibold"}>{formatFileSize(totalSize)}</span>
-                        <span className="text-gray-400"> / {MAX_FILE_SIZE_LABEL}</span>
-                      </div>
-                    </div>
-                    <div className="max-h-72 overflow-y-auto pr-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {files.map((file, idx) => {
-                          const name = file.name || file.filename || "file";
-                          const size = file instanceof File ? file.size : Number(file.size ?? 0);
-                          return (
-                            <div key={`${name}-${idx}-${size}`} className="flex items-start gap-3 rounded-xl border bg-gray-50/70 p-3 sm:p-3.5 min-w-0" style={{ borderColor: "var(--color-border-primary)" }} title={name}>
-                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white border text-gray-600 shadow-sm" style={{ borderColor: "var(--color-border-primary)" }} aria-hidden="true">
-                                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="m-0 text-sm font-semibold text-gray-900 leading-snug break-words line-clamp-3">{name}</p>
-                                <p className="m-0 mt-1 text-xs text-gray-500">{formatFileSize(size)}</p>
-                              </div>
-                              <button type="button" disabled={isGuest} onClick={() => handleRemoveFile(idx)} className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white text-gray-500 transition-colors ${isGuest ? "opacity-50 cursor-not-allowed" : "hover:text-red-600 hover:border-red-200 hover:bg-red-50 cursor-pointer"}`} style={{ borderColor: "var(--color-border-primary)" }} aria-label={`Remove ${name}`} title="Remove file">
-                                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="mt-4 flex justify-center sm:justify-end">
-                      <button type="button" onClick={() => handleAddMoreFiles(files, isGuest)} className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${isGuest ? "cursor-not-allowed" : "cursor-pointer"} ${atLimit ? "opacity-50" : "hover:bg-gray-50"}`} style={{ borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" }} aria-label="Add more files">
-                        <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                        Add more
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const hasChanges = () => {
-    const keys = new Set([...Object.keys(formData || {}), ...Object.keys(initialData || {})]);
-    for (let key of keys) {
-      const current = formData?.[key];
-      const initial = initialData?.[key];
-      if (Array.isArray(current) || Array.isArray(initial)) {
-        if (!Array.isArray(current) || !Array.isArray(initial) || current.length !== initial.length) return true;
-        for (let i = 0; i < current.length; i++) {
-          const a = current[i];
-          const b = initial[i];
-          if (a instanceof File || b instanceof File) {
-            if (!(a instanceof File) || !(b instanceof File) || a.name !== b.name || a.size !== b.size || a.lastModified !== b.lastModified) return true;
-          } else if (a !== b) return true;
-        }
-        continue;
-      }
-      if (typeof current === "string" && typeof initial === "string") {
-        if (current.trim() !== initial.trim()) return true;
-        continue;
-      }
-      if (current !== initial) {
-        if (current == null && initial == null) continue;
-        if (current == null || initial == null) return true;
-        if (String(current).trim && String(initial).trim) {
-          if (String(current).trim() !== String(initial).trim()) return true;
-          continue;
-        }
-        if (current !== initial) return true;
-      }
-    }
-    return false;
-  };
-
-  const isDirty = hasChanges();
+  const pendingAdds = formData.UploadContentType === "documents" ? newFiles.length : 0;
+  const pendingChanges =
+    (deletedKeys.length > 0 ? `${deletedKeys.length} to remove` : "") +
+    (pendingAdds > 0 ? `${deletedKeys.length > 0 ? " · " : ""}${pendingAdds} to add` : "");
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Edit Quiz/Exam
         </h1>
-        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">Update quiz or exam details</p>
+        <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">
+          Update the quiz or exam details and its attached documents
+        </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full">
+      <div className="w-full">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div
             className="bg-white border rounded-2xl p-6 sm:p-8"
@@ -675,23 +651,34 @@ const QuizEditPage = () => {
           >
             <div className="space-y-5">
               <div>
-                <label htmlFor="title" className={labelClass}>
+                <label htmlFor="quiz-title" className={labelClass}>
                   Title <span className="text-red-500">*</span>
                 </label>
-                <input readOnly={isGuest} disabled={isGuest}
-                  id="title"
+                <input
+                  id="quiz-title"
                   name="title"
                   type="text"
                   maxLength={100}
-                  value={formData.title || ""}
+                  value={formData.title}
                   onChange={handleChange}
+                  placeholder="Enter quiz title"
                   className={inputClass}
                   style={fieldStyle}
+                  disabled={isGuest}
                   required
                 />
               </div>
 
-              {renderContentSection()}
+              <ContentSection
+                data={formData}
+                setter={setFormData}
+                idPrefix="quiz-edit"
+                disabled={isGuest}
+                onSetContentType={handleSetContentType}
+                onFileSelection={handleFileSelection}
+                onRemoveFile={handleRemoveFile}
+                onAddMoreFiles={handleAddMoreFiles}
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
@@ -700,6 +687,7 @@ const QuizEditPage = () => {
                   </label>
                   {renderFaculties("quiz-faculty", formData.faculty)}
                 </div>
+
                 <div>
                   <label htmlFor="quiz-division" className={labelClass}>
                     Division <span className="text-red-500">*</span>
@@ -715,12 +703,14 @@ const QuizEditPage = () => {
                   </label>
                   {renderSubjects("quiz-subject", formData.subject)}
                 </div>
+
                 <div>
                   <label htmlFor="quiz-year" className={labelClass}>
                     Year <span className="text-red-500">*</span>
                   </label>
                   {renderYears("quiz-year", formData.year)}
                 </div>
+
                 <div>
                   <label htmlFor="quiz-semester" className={labelClass}>
                     Semester <span className="text-red-500">*</span>
@@ -733,58 +723,70 @@ const QuizEditPage = () => {
                 <label htmlFor="quizDate" className={labelClass}>
                   Quiz Date (only date) <span className="text-red-500">*</span>
                 </label>
-                <input readOnly={isGuest} disabled={isGuest}
+                <input
                   id="quizDate"
                   name="QuizDate"
                   type="date"
-                  value={quizDateValue}
+                  value={formData.QuizDate}
                   onChange={handleChange}
                   className={inputClass}
                   style={fieldStyle}
+                  disabled={isGuest}
                   required
                 />
               </div>
 
               <div>
-                <label htmlFor="notes" className={labelClass}>
+                <label htmlFor="quiz-notes" className={labelClass}>
                   Notes
                 </label>
-                <textarea readOnly={isGuest} disabled={isGuest}
-                  id="notes"
+                <textarea
+                  id="quiz-notes"
                   name="notes"
                   maxLength={400}
-                  value={formData.notes || formData.description || ""}
+                  value={formData.notes}
                   onChange={handleChange}
+                  placeholder="Additional notes about this quiz..."
                   rows={4}
                   className={`${inputClass} resize-none`}
                   style={fieldStyle}
+                  disabled={isGuest}
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            {pendingChanges && (
+              <p className="m-0 mt-5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-amber-800">
+                Documents pending save: {pendingChanges}
+              </p>
+            )}
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <button
                 type="submit"
-                disabled={loading || !isDirty}
-                className="px-8 rounded-xl font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] py-3"
-                style={{
-                  backgroundColor: "var(--color-brand-primary)",
-                  color: "#ffffff",
-                  opacity: isDirty ? 1 : 0.5,
-                }}
-                onMouseEnter={(e) => {
-                  if (isDirty) e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--color-brand-primary)";
-                }}
+                disabled={saving || isGuest}
+                className={`w-full sm:w-auto px-8 py-3 rounded-xl text-white font-bold text-sm tracking-tight transition-all disabled:cursor-not-allowed active:scale-[0.99] ${
+                  isGuest ? "opacity-60" : "disabled:opacity-85"
+                }`}
+                style={{ backgroundColor: "var(--color-brand-primary)", color: "var(--color-text-white)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-brand-primary)")}
               >
-                {loading ? "Saving..." : "Save"}
+                {saving ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                    Saving...
+                  </span>
+                ) : (
+                  "Save Changes"
+                )}
               </button>
+
               <button
                 type="button"
-                onClick={() => navigate(-1)}
-                className="px-8 rounded-xl border bg-white font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 py-3"
+                onClick={() => navigate(`/quiz/${quizId}`)}
+                disabled={saving}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl border bg-white text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{ borderColor: "var(--color-border-primary)" }}
               >
                 Cancel

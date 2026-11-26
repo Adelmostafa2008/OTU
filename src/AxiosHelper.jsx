@@ -61,7 +61,7 @@ api.interceptors.request.use((config) => {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${user.token}`;
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
   if (typeof FormData !== "undefined" && config.data instanceof FormData) {
@@ -135,7 +135,7 @@ api.interceptors.response.use(
             user.token = token;
             localStorage.setItem("user", JSON.stringify(user));
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -143,7 +143,7 @@ api.interceptors.response.use(
       const latestToken = (() => {
         try {
           return JSON.parse(localStorage.getItem("user"))?.token || token;
-        } catch (e) {
+        } catch {
           return token;
         }
       })();

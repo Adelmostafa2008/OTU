@@ -9,6 +9,17 @@ const ChangePassword = () => {
   const { user, isGuest } = useAuth();
   const navigate = useNavigate();
   const { ShowSnackBar } = useSnack();
+  const [cool, setCool] = useState(false);
+
+  const handelSnack = (msg, ty) => {
+    if (!cool) {
+      setCool(true);
+      ShowSnackBar(msg, ty);
+      setTimeout(() => {
+        setCool(false);
+      }, 5000);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     oldPassword: "",
@@ -26,7 +37,7 @@ const ChangePassword = () => {
     if (!/[0-9]/.test(password)) {
       return "Password must contain at least one number.";
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/]/.test(password)) {
       return "Password must contain at least one special character.";
     }
     if (!/[A-Z]/.test(password)) {
@@ -49,18 +60,18 @@ const ChangePassword = () => {
     e.preventDefault();
 
     if (!formData.oldPassword || !formData.newPassword || !formData.confirmPassword) {
-      ShowSnackBar("Please fill in all fields.", "warn");
+      handelSnack("Please fill in all fields.", "warn");
       return;
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      ShowSnackBar("New password and confirm password do not match.", "warn");
+      handelSnack("New password and confirm password do not match.", "warn");
       return;
     }
 
     const passwordError = validateNewPassword(formData.newPassword);
     if (passwordError) {
-      ShowSnackBar(passwordError, "warn");
+      handelSnack(passwordError, "warn");
       return;
     }
 
@@ -85,7 +96,7 @@ const ChangePassword = () => {
         res?.message ||
         (typeof res?.data === "string" ? res.data : null) ||
         "Password changed successfully.";
-      ShowSnackBar(successMsg, "success");
+      handelSnack(successMsg, "success");
       navigate("/profile");
     } catch (err) {
       const errMsg =
@@ -95,7 +106,7 @@ const ChangePassword = () => {
         err?.response?.message ||
         (typeof err?.response?.data === "string" ? err.response.data : null) ||
         "Failed to change password.";
-      ShowSnackBar(errMsg, "error");
+      handelSnack(errMsg, "error");
     } finally {
       setLoading(false);
     }
@@ -103,7 +114,7 @@ const ChangePassword = () => {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto space-y-2">
+      <div className="max-w-2xl mx-auto w-full space-y-2">
         <h1 className="m-0 text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Change Password
         </h1>
@@ -116,8 +127,8 @@ const ChangePassword = () => {
     "w-full rounded-xl border bg-white px-3.5 py-3 pr-10 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:outline-none focus:ring-4";
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-2xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Change Password
         </h1>
@@ -126,7 +137,7 @@ const ChangePassword = () => {
         </p>
       </div>
 
-      <div className="max-w-2xl mx-auto w-full">
+      <div className="w-full">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div
             className="bg-white border rounded-2xl p-6 sm:p-8"

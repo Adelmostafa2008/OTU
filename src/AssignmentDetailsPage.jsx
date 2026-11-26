@@ -1,34 +1,26 @@
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
 import { useSnack } from "./SnackBarContext.jsx";
 import { DetailPageSkeleton } from "./Skeleton";
-import { FiEdit2, FiTrash2 } from "react-icons/fi";
+import DetailShell, { SectionHeading } from "./DetailShell";
+import {
+  getContentField,
+  getCountdown,
+  getDetailDocuments,
+  hasFieldValue,
+} from "./detailUtils";
+import {
+  GUEST_ACTION_MESSAGE,
+  GUEST_DOWNLOAD_MESSAGE,
+  getGuestAssignment,
+} from "./props";
+import { FiCheckSquare, FiEdit2, FiTrash2 } from "react-icons/fi";
 
-const getDaysLeft = (dateString) => {
-  if (!dateString) return null;
-  const eventDate = new Date(dateString);
-  if (isNaN(eventDate.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  eventDate.setHours(0, 0, 0, 0);
-  const diffTime = eventDate - today;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return -1;
-  if (diffDays === 0) return 0;
-  return diffDays;
-};
+const getUserId = (user) =>
+  user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
 
-const formatMeetingDateTime = (dateString) => {
-  if (!dateString) return null;
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return { formattedDate: dateString, formattedTime: null };
-  const options = { year: "numeric", month: "short", day: "numeric" };
-  const formattedDate = date.toLocaleDateString(undefined, options);
-  const formattedTime = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "numeric" });
-  return { formattedDate, formattedTime };
-};
 const getIsCreator = (item) => {
   const flag =
     item?.iscreator ?? item?.isCreator ?? item?.IsCreator ?? item?.Iscreator;
@@ -68,72 +60,91 @@ const getSuccessMessage = (res, fallback) => {
   return fallback;
 };
 
-const getUploaderDisplayName = (item) => {
-  const fullName = item?.uploadername ?? item?.uplodername ?? item?.uploaderName;
-  if (typeof fullName !== "string") return null;
-  const parts = fullName.trim().split(" ").filter(Boolean);
-  if (parts.length === 0) return null;
-  return parts.slice(0, 2).join(" ");
-};
-
 const AssignmentDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, isGuest } = useAuth();
   const { ShowSnackBar } = useSnack();
+  const showSnackRef = useRef(ShowSnackBar);
+  const coolRef = useRef(false);
+
+  useEffect(() => {
+    showSnackRef.current = ShowSnackBar;
+  }, [ShowSnackBar]);
+
+  const handelSnack = (msg, ty) => {
+    if (coolRef.current) return;
+    coolRef.current = true;
+    showSnackRef.current(msg, ty);
+    setTimeout(() => {
+      coolRef.current = false;
+    }, 5000);
+  };
+
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isGuest) return;
+
+    let cancelled = false;
     const fetchAssignment = async () => {
       try {
         setLoading(true);
-        const userId = user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
-        let response;
-        try {
-          response = await api.get(`Student/assignment/${userId}?assignmentId=${id}`);
-        } catch (e) {
-          throw e;
-        }
-        if (response?.data) {
-          setAssignment(response.data);
-        } else {
-          setAssignment(null);
-        }
-      } catch (err) {
-        setAssignment(null);
+        const response = await api.get(
+          `Student/assignment/${getUserId(user)}?assignmentId=${id}`
+        );
+        console.log(response.data);
+        
+        if (!cancelled) setAssignment(response?.data || null);
+      } catch {
+        if (!cancelled) setAssignment(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchAssignment();
-  }, [id, user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [id, user, isGuest]);
+
+  const blockGuest = () => {
+    handelSnack(GUEST_ACTION_MESSAGE, "warn");
+  };
+  const blockGuestDownload = () => handelSnack(GUEST_DOWNLOAD_MESSAGE, "warn");
 
   const handleDelete = async () => {
-    if (isGuest) return;
+    if (isGuest) {
+      blockGuest();
+      return;
+    }
     const confirmed = window.confirm("Are you sure you want to delete this assignment?");
     if (!confirmed) return;
 
     try {
       const res = await api.delete(`/assignment/${id}`);
-      ShowSnackBar(getSuccessMessage(res, "Deleted successfully."), "success");
+      handelSnack(getSuccessMessage(res, "Deleted successfully."), "success");
       navigate("/");
     } catch (err) {
-      ShowSnackBar(getErrorMessage(err, "Failed to delete."), "error");
+      handelSnack(getErrorMessage(err, "Failed to delete."), "error");
     }
   };
 
   const handleEdit = () => {
-    navigate(`/assignment/${id}/edit`, { state: { assignment: assignment } });
+    if (isGuest) {
+      blockGuest();
+      return;
+    }
+    navigate(`/assignment/${id}/edit`, { state: { assignment } });
   };
 
-  if (loading) {
+  if (loading && !isGuest) {
     return <DetailPageSkeleton />;
   }
 
-  const data = assignment;
+  const data = isGuest ? getGuestAssignment(id) : assignment;
   if (!data) {
     return (
       <div className="max-w-3xl mx-auto">
@@ -146,115 +157,112 @@ const AssignmentDetailsPage = () => {
       </div>
     );
   }
-  const title = data.title || data.name || "Untitled Assignment";
-  const date = data.deadline || data.Deadline || data.date || data.assignmentDate || data.OnlineMeetingDate || data.meetingDate || "";
-  const daysLeft = getDaysLeft(date);
-  const formatted = formatMeetingDateTime(date);
-  const description = data.description || data.notes || null;
-  const uploaderDisplayName = getUploaderDisplayName(data);
-  const isCreator = getIsCreator(data);
 
-  const infoFields = [
-    { label: "Description/Notes", value: description || "No description assigned" },
+  const title = data.title || data.name || "Untitled Assignment";
+  const date =
+    data.deadline ||
+    data.Deadline ||
+    data.assignmentDate ||
+    data.date ||
+    data.OnlineMeetingDate ||
+    data.meetingDate ||
+    "";
+  const description = data.description || null;
+  const instructions = data.instructions || data.description || data.notes || null;
+  const uploader =
+    data.uploadername || data.uplodername || data.uploaderName || null;
+  const isCreator = getIsCreator(data);
+  const documents = getDetailDocuments(data);
+  const countdown = getCountdown(date, "due");
+  const assignmentLink = getContentField(data, [
+    "link",
+    "assignmentlink",
+    "uploadlink",
+    "contentlink",
+  ]);
+  const assignmentText = getContentField(data, [
+    "text",
+    "assignmenttext",
+    "uploadtext",
+    "contenttext",
+  ]);
+  const hasLink = hasFieldValue(assignmentLink);
+  const hasText = hasFieldValue(assignmentText);
+
+  const meta = [
     { label: "Faculty", value: data.faculty },
     { label: "Division", value: data.division },
     { label: "Subject", value: data.subject },
     { label: "Year", value: data.year },
     { label: "Semester", value: data.semester },
-  ].filter((f) => f.value !== undefined && f.value !== null && f.value !== "");
+    data.totalmarks ? { label: "Marks", value: String(data.totalmarks) } : null,
+    data.submissionmode ? { label: "Submit via", value: data.submissionmode } : null,
+  ].filter((item) => item && item.value !== undefined && item.value !== null && item.value !== "");
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto w-full">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight break-words">
-            {title}
-          </h1>
-          {date ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-              {formatted ? (
-                <>
-                  <p className="m-0 text-base font-medium text-gray-700">
-                    {formatted.formattedDate}
-                    {formatted.formattedTime ? ` · ${formatted.formattedTime}` : ""}
-                  </p>
-                </>
-              ) : (
-                <p className="m-0 text-base font-medium text-gray-700">{date}</p>
-              )}
-              {daysLeft !== null ? (
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-brand-primary)" }}
-                >
-                  {daysLeft === 0 ? "Today" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
-                </span>
-              ) : null}
-            </div>
+    <DetailShell
+      kind="Assignment"
+      KindIcon={FiCheckSquare}
+      title={title}
+      uploader={uploader}
+      date={date}
+      dateLabel="Deadline"
+      countdown={countdown}
+      badge={data.totalmarks ? `${data.totalmarks} marks` : null}
+      meta={meta}
+      guest={isGuest}
+      documents={documents}
+      link={hasLink ? assignmentLink : null}
+      text={hasText ? assignmentText : null}
+      textLabel="Assignment content"
+      onGuestAction={blockGuest}
+      onGuestDownload={blockGuestDownload}
+      notes={data.notes && data.notes !== instructions ? data.notes : null}
+      afterDocuments={
+        <>
+          {instructions ? (
+            <section className="space-y-3">
+              <SectionHeading icon={FiCheckSquare} title="Brief & Instructions" />
+              <p className="m-0 text-sm sm:text-[15px] text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-left">
+                {instructions}
+              </p>
+            </section>
           ) : null}
-        </div>
-        {isCreator ? (
-          <div className="flex items-center gap-2 flex-shrink-0">
+
+          {description && description !== instructions ? (
+            <section className="space-y-3">
+              <SectionHeading icon={FiCheckSquare} title="Description" />
+              <p className="m-0 text-sm sm:text-[15px] text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-left">
+                {description}
+              </p>
+            </section>
+          ) : null}
+        </>
+      }
+      actions={
+        isCreator ? (
+          <>
             <button
               onClick={handleEdit}
-              className="flex items-center gap-2 rounded-xl border bg-white text-gray-900 font-semibold text-sm cursor-pointer transition-colors hover:bg-gray-50 px-3.5 py-2.5"
+              className="flex items-center gap-2 rounded-xl border bg-white text-gray-900 font-semibold text-sm cursor-pointer px-3.5 py-2.5 shadow-sm transition-colors hover:bg-gray-50"
               style={{ borderColor: "var(--color-border-primary)" }}
-              aria-label="Edit"
+              aria-label="Edit assignment"
             >
               <FiEdit2 size={16} />
               Edit
             </button>
             <button
-              onClick={handleDelete} disabled={isGuest} className={isGuest ? "opacity-60 pointer-events-none" : "flex items-center gap-2 rounded-xl border border-red-300 bg-white text-red-600 font-semibold text-sm cursor-pointer transition-colors hover:bg-red-50 px-3.5 py-2.5"}
-              aria-label="Delete"
+              onClick={handleDelete}
+              className="flex items-center gap-2 rounded-xl border border-red-300 bg-white text-red-600 font-semibold text-sm cursor-pointer px-3.5 py-2.5 shadow-sm transition-colors hover:bg-red-50"
+              aria-label="Delete assignment"
             >
               <FiTrash2 size={16} />
               Delete
             </button>
-          </div>
-        ) : null}
-      </div>
-
-      <div
-        className="bg-white border rounded-2xl p-6 sm:p-8 space-y-5"
-        style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
-      >
-        {uploaderDisplayName && (
-          <div className="flex justify-end">
-            <div
-              className="inline-flex items-center gap-2.5 rounded-full border border-gray-200/80 bg-white/90 pl-2 pr-3.5 py-1.5 shadow-sm backdrop-blur-sm"
-              title={`Uploaded by ${uploaderDisplayName}`}
-            >
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-inner"
-                style={{ background: "linear-gradient(135deg, var(--color-brand-primary), #7c3aed)" }}
-                aria-hidden="true"
-              >
-                {uploaderDisplayName.charAt(0).toUpperCase()}
-              </span>
-              <span className="flex flex-col leading-tight">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                  Uploaded by
-                </span>
-                <span className="text-sm font-semibold text-gray-900 max-w-[10rem] truncate">
-                  {uploaderDisplayName}
-                </span>
-              </span>
-            </div>
-          </div>
-        )}
-        {infoFields.map((field) => (
-          <div key={field.label} className="min-w-0">
-            <h2 className="m-0 mb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {field.label}
-            </h2>
-            <p className="m-0 text-sm sm:text-base text-gray-700 leading-relaxed whitespace-normal break-words w-full">
-              {field.value}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
+          </>
+        ) : null
+      }
+    />
   );
 };
 

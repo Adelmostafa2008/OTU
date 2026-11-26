@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "./AxiosHelper";
 import { useAuth } from "./AuthContext";
 import { ListRowSkeleton } from "./Skeleton";
+import { guestQuizzes } from "./props";
 
 const PAGE_SIZE = 12;
 
@@ -49,7 +50,7 @@ const extractTotalPages = (payload, itemsLength, page) => {
 
 const AllQuizzesPage = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isGuest } = useAuth();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -57,20 +58,10 @@ const AllQuizzesPage = () => {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setQuizzes([]);
-      setLoading(false);
-      setTotalPages(1);
-      return;
-    }
+    if (isGuest || !user) return;
 
     const userId = user?.id || user?.userId || user?._id;
-    if (userId === undefined || userId === null || userId === "") {
-      setQuizzes([]);
-      setLoading(false);
-      setTotalPages(1);
-      return;
-    }
+    if (userId === undefined || userId === null || userId === "") return;
 
     let cancelled = false;
     const fetchQuizzes = async () => {
@@ -85,7 +76,7 @@ const AllQuizzesPage = () => {
         const items = extractItems(payload);
         setQuizzes(items);
         setTotalPages(extractTotalPages(payload, items.length, page));
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setQuizzes([]);
           setTotalPages(Math.max(1, page));
@@ -101,11 +92,14 @@ const AllQuizzesPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading, page]);
+  }, [user, authLoading, page, isGuest]);
+
+  const displayQuizzes = isGuest ? guestQuizzes : quizzes;
+  const showLoading = !isGuest && (authLoading || (loading && !!user));
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Quizzes/Exams
         </h1>
@@ -114,12 +108,12 @@ const AllQuizzesPage = () => {
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full space-y-3">
-        {loading || authLoading ? (
+      <div className="w-full space-y-3">
+        {showLoading ? (
           Array.from({ length: 5 }).map((_, index) => (
             <ListRowSkeleton key={`quiz-row-skeleton-${index}`} />
           ))
-        ) : quizzes.length === 0 ? (
+        ) : displayQuizzes.length === 0 ? (
           <div
             className="w-full bg-white border rounded-2xl px-5 py-8 text-sm text-gray-500 text-center"
             style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
@@ -127,10 +121,11 @@ const AllQuizzesPage = () => {
             No quizzes added yet
           </div>
         ) : (
-          quizzes.map((item, index) => {
+          displayQuizzes.map((item, index) => {
             const id = item.id || item._id || `${page}-${index}`;
             const title = item.title || item.name || "Untitled Quiz";
-            const date = item.date || item.quizDate || item.QuizDate || "";
+            const date =
+              item.quizdate || item.date || item.quizDate || item.QuizDate || "";
             const formattedDate = formatDate(date);
             const description = item.description || item.notes || null;
 
@@ -170,7 +165,7 @@ const AllQuizzesPage = () => {
           })
         )}
 
-        {!loading && !authLoading && (quizzes.length > 0 || page > 1) ? (
+        {!showLoading && !isGuest && (displayQuizzes.length > 0 || page > 1) ? (
           <div className="flex items-center justify-between gap-3 pt-2">
             <button
               type="button"

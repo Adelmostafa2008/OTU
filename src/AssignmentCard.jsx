@@ -29,7 +29,12 @@ const formatMeetingDateTime = (dateString) => {
   return { formattedDate, formattedTime };
 };
 
-const AssignmentCard = ({ assignments = [], loading = false, truncateTitles = false }) => {
+const AssignmentCard = ({
+  assignments = [],
+  loading = false,
+  truncateTitles = false,
+  readOnly = false,
+}) => {
   const navigate = useNavigate();
   const displayItems = Array.isArray(assignments) ? assignments.slice(0, 5) : [];
 
@@ -76,7 +81,7 @@ const AssignmentCard = ({ assignments = [], loading = false, truncateTitles = fa
             const formatted = formatMeetingDateTime(date);
 
             if (daysLeft === -1) {
-              if (id && id !== "0" && id !== 0) {
+              if (!readOnly && id && id !== "0" && id !== 0) {
                 api.delete(`/assignment/${id}`).catch(() => {});
               }
               return null;

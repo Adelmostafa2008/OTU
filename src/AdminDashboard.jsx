@@ -11,13 +11,12 @@ const AdminDashboard = () => {
       navigate("/login", { replace: true });
       return;
     }
-    if (user.role !== "admin" && user.role !== "guest") {
+    if (String(user.role ?? "").toLowerCase() !== "admin") {
       navigate("/", { replace: true });
-      return;
     }
   }, [user, navigate]);
 
-  if (!user || (user.role !== "admin" && user.role !== "guest")) {
+  if (!user || String(user.role ?? "").toLowerCase() !== "admin") {
     return null;
   }
 

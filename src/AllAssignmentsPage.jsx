@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "./AxiosHelper";
 import { useAuth } from "./AuthContext";
 import { ListRowSkeleton } from "./Skeleton";
+import { guestAssignments } from "./props";
 
 const PAGE_SIZE = 12;
 
@@ -54,7 +55,7 @@ const extractTotalPages = (payload, itemsLength, page) => {
 
 const AllAssignmentsPage = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isGuest } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -62,20 +63,10 @@ const AllAssignmentsPage = () => {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setAssignments([]);
-      setLoading(false);
-      setTotalPages(1);
-      return;
-    }
+    if (isGuest || !user) return;
 
     const userId = user?.id || user?.userId || user?._id;
-    if (userId === undefined || userId === null || userId === "") {
-      setAssignments([]);
-      setLoading(false);
-      setTotalPages(1);
-      return;
-    }
+    if (userId === undefined || userId === null || userId === "") return;
 
     let cancelled = false;
     const fetchAssignments = async () => {
@@ -90,7 +81,7 @@ const AllAssignmentsPage = () => {
         const items = extractItems(payload);
         setAssignments(items);
         setTotalPages(extractTotalPages(payload, items.length, page));
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setAssignments([]);
           setTotalPages(Math.max(1, page));
@@ -106,11 +97,14 @@ const AllAssignmentsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading, page]);
+  }, [user, authLoading, page, isGuest]);
+
+  const displayAssignments = isGuest ? guestAssignments : assignments;
+  const showLoading = !isGuest && (authLoading || (loading && !!user));
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Assignments
         </h1>
@@ -119,12 +113,12 @@ const AllAssignmentsPage = () => {
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full space-y-3">
-        {loading || authLoading ? (
+      <div className="w-full space-y-3">
+        {showLoading ? (
           Array.from({ length: 5 }).map((_, index) => (
             <ListRowSkeleton key={`assignment-row-skeleton-${index}`} />
           ))
-        ) : assignments.length === 0 ? (
+        ) : displayAssignments.length === 0 ? (
           <div
             className="w-full bg-white border rounded-2xl px-5 py-8 text-sm text-gray-500 text-center"
             style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
@@ -132,7 +126,7 @@ const AllAssignmentsPage = () => {
             No assignments added yet
           </div>
         ) : (
-          assignments.map((item, index) => {
+          displayAssignments.map((item, index) => {
             const id = item.id || item._id || `${page}-${index}`;
             const title = item.title || item.name || "Untitled Assignment";
             const date = item.date || item.assignmentDate || item.OnlineMeetingDate || item.deadline || "";
@@ -177,7 +171,7 @@ const AllAssignmentsPage = () => {
           })
         )}
 
-        {!loading && !authLoading && (assignments.length > 0 || page > 1) ? (
+        {!showLoading && !isGuest && (displayAssignments.length > 0 || page > 1) ? (
           <div className="flex items-center justify-between gap-3 pt-2">
             <button
               type="button"

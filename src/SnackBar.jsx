@@ -1,20 +1,9 @@
-import { useEffect, useState } from"react";
 import { FaCircleCheck } from"react-icons/fa6";
 import { IoIosInformationCircle } from"react-icons/io";
 import { BiSolidErrorAlt } from"react-icons/bi";
 import { IoIosWarning } from"react-icons/io";
 
 export default function SnackBar({ message, type }) {
- const [visible, setVisible] = useState(false);
-
- useEffect(() => {
- if (message !=="") {
- setVisible(true);
- const timer = setTimeout(() => setVisible(false), 4000); // fade out before unmount
- return () => clearTimeout(timer);
- }
- }, [message]);
-
  if (message ==="") return null;
 
  const color = {
@@ -43,8 +32,7 @@ export default function SnackBar({ message, type }) {
  return (
  <div
  className={`flex gap-x-1.5 items-center ${color[type]} overflow-hidden mr-6 pr-20 py-4 pl-5 text-left rounded-lg text-white fixed bottom-5 left-5 z-[100]
- transform transition-all duration-500 ease-in-out
- ${visible ?"translate-x-0 opacity-100" :"-translate-x-10 opacity-0"}`}
+ transform transition-all duration-300 ease-out translate-x-0 opacity-100`}
  >
  {icon}
  {message}

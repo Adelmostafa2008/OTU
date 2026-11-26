@@ -62,10 +62,7 @@ body,
 body {
   margin: 0;
   color: var(--color-text-primary);
-  background:
-    radial-gradient(1200px 500px at 20% -10%, rgba(158, 194, 70, 0.08), transparent 60%),
-    radial-gradient(900px 400px at 100% 0%, rgba(17, 24, 39, 0.04), transparent 55%),
-    var(--color-bg-secondary);
+  background: var(--color-bg-secondary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

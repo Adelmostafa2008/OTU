@@ -1,8 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
 import { useSnack } from "./SnackBarContext.jsx";
+import ContentSection from "./ContentSection.jsx";
+import {
+  MEETING_CONTENT_TYPES,
+  MAX_FILE_SIZE,
+  MAX_FILE_SIZE_LABEL,
+  buildContentPayload,
+  formatFileSize,
+  getFilesTotalSize,
+} from "./contentUtils.js";
 import axios from "axios";
 
 const s3Client = axios.create();
@@ -36,11 +45,6 @@ const DIVISIONS_BY_FACULTY = {
 const YEARS = ["1", "2", "3", "4"];
 const SEMESTERS = ["first", "second"];
 const LESSON_TYPES = ["Lab", "Lecture"];
-const CONTENT_TYPES = ["link", "text", "documents"];
-// Online meetings never support documents, only a link or text content.
-const MEETING_CONTENT_TYPES = ["link", "text"];
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const MAX_FILE_SIZE_LABEL = "50MB";
 
 const baseContentFields = () => ({
   UploadContentType: "link",
@@ -101,62 +105,6 @@ const emptyAssignment = () => ({
   ...baseContentFields(),
 });
 
-// Empty optional fields are dropped because empty strings can fail
-// server-side validation on fields that are supposed to be omitted.
-const OPTIONAL_FIELDS = ["notes", "UploadLink", "UploadText"];
-
-const preparePayload = (data) => {
-  const payload = {};
-  Object.entries(data).forEach(([key, value]) => {
-    if (value === null || value === undefined) return;
-    if (Array.isArray(value)) {
-      payload[key] = value;
-      return;
-    }
-    if (typeof value !== "string") {
-      payload[key] = value;
-      return;
-    }
-    const cleaned = value.trim();
-    if (cleaned === "" && OPTIONAL_FIELDS.includes(key)) return;
-    payload[key] = cleaned;
-  });
-  return payload;
-};
-
-// Files are never sent to the API. Only a light descriptor is sent (the actual
-// bytes go to the cloud storage separately), matching the server `docs` DTO.
-const toDocDescriptor = (file) => {
-  if (!file) return null;
-  const isFile = typeof File !== "undefined" && file instanceof File;
-  const filename = isFile ? file.name : file.filename ?? file.name ?? "";
-  const size = isFile ? file.size : Number(file.size ?? 0);
-  const contentType = isFile ? file.type || "application/octet-stream" : "no type assigned"
-
-  return {
-    filename: String(filename),
-    size: Number.isFinite(size) ? size : 0,
-    content_type: String(contentType),
-  };
-};
-
-const buildDocs = (files) =>
-  (Array.isArray(files) ? files : []).map(toDocDescriptor).filter(Boolean);
-
-const formatFileSize = (bytes) => {
-  const size = Number(bytes) || 0;
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-};
-
-const getFilesTotalSize = (files) =>
-  (Array.isArray(files) ? files : []).reduce((sum, file) => {
-    const size = file instanceof File ? file.size : Number(file?.size ?? 0);
-    return sum + (Number.isFinite(size) ? size : 0);
-  }, 0);
-
 // After the API creates the records it answers with one presigned URL per file.
 // The bytes are then put straight into the cloud storage, exactly like the
 // lesson tab does it. Non-file entries (already saved descriptors) are skipped.
@@ -178,35 +126,10 @@ const uploadFilesToStorage = async (response, files) => {
   );
 };
 
-// Builds the plain JSON body the API expects. Only the properties of the
-// selected content tab get a value; the rest are sent as null.
-const buildSubmissionData = (data, { allowDocuments = true } = {}) => {
-  const { UploadFiles, ...rest } = data;
-  const payload = preparePayload(rest);
-
-  const type = !allowDocuments
-    ? data.UploadContentType === "text"
-      ? "text"
-      : "link"
-    : data.UploadContentType || "link";
-
-  const docs = allowDocuments && type === "documents" ? buildDocs(UploadFiles) : null;
-
-  payload.UploadLink = type === "link" ? String(data.UploadLink ?? "").trim() : null;
-  payload.UploadText = type === "text" ? String(data.UploadText ?? "").trim() : null;
-
-  // UploadContentType names the selected tab: "link", "text" or "documents".
-  payload.UploadContentType = type;
-
-  if (allowDocuments) {
-    payload.docs = docs;
-  } else {
-    delete payload.docs;
-    delete payload.UploadFiles;
-  }
-
-  return payload;
-};
+// Builds the plain JSON body the API expects for the selected tab. Every
+// accepted property is present; nullable ones are sent as null.
+const buildSubmissionData = (data, options = {}) =>
+  buildContentPayload(data, options);
 
 const validateContentFields = (data, showSnack, { allowDocuments = true } = {}) => {
   const type = allowDocuments ? data.UploadContentType || "link" : data.UploadContentType === "text" ? "text" : "link";
@@ -325,234 +248,22 @@ const selectClass = `${inputClass} cursor-pointer truncate text-ellipsis pr-10`;
 const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
 const fieldStyle = { borderColor: "var(--color-border-primary)" };
 
-const ContentSection = ({ data, setter, idPrefix, disabled = false, allowedTypes = CONTENT_TYPES, onSetContentType, onFileSelection, onRemoveFile, onAddMoreFiles }) => {
-    const type = data.UploadContentType || "link";
-    const tabBase =
-      "px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors";
-    const activeStyle = { backgroundColor: "var(--color-brand-primary)", color: "#ffffff", borderColor: "var(--color-brand-primary)" };
-    const inactiveStyle = { borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" };
-    const files = Array.isArray(data.UploadFiles) ? data.UploadFiles : [];
-    return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {allowedTypes.map((option) => {
-            const active = type === option;
-            const label = option === "link" ? "Link" : option === "text" ? "Text" : "Documents";
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onSetContentType(setter, option)}
-                className={`${tabBase} cursor-pointer`}
-                style={active ? activeStyle : inactiveStyle}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {type === "link" && (
-          <div>
-            <label htmlFor={`${idPrefix}-upload-link`} className={labelClass}>
-              Link <span className="text-red-500">*</span>
-            </label>
-            <input
-              id={`${idPrefix}-upload-link`}
-              name="UploadLink"
-              type="url"
-              disabled={disabled}
-              value={data.UploadLink || ""}
-              onChange={(e) => setter((prev) => ({ ...prev, UploadLink: e.target.value }))}
-              placeholder="https://example.com/resource"
-              className={inputClass}
-              style={fieldStyle}
-              required={!disabled}
-            />
-          </div>
-        )}
-
-        {type === "text" && (
-          <div>
-            <label htmlFor={`${idPrefix}-upload-text`} className={labelClass}>
-              Text <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              id={`${idPrefix}-upload-text`}
-              name="UploadText"
-              disabled={disabled}
-              value={data.UploadText || ""}
-              onChange={(e) => setter((prev) => ({ ...prev, UploadText: e.target.value }))}
-              placeholder="Enter text content..."
-              rows={6}
-              className={`${inputClass} resize-none overflow-y-auto`}
-              style={{ ...fieldStyle, minHeight: "160px" }}
-              required={!disabled}
-            />
-          </div>
-        )}
-
-        {type === "documents" && (
-          <div>
-            <label className={labelClass}>
-              Documents <span className="text-red-500">*</span>
-            </label>
-            <div
-              className="w-full rounded-2xl border-2 border-dashed p-5 sm:p-6 flex flex-col items-stretch text-center bg-gray-50/60"
-              style={{ borderColor: "var(--color-border-primary)" }}
-            >
-              <div className="flex flex-col items-center justify-center">
-                <input
-                  id={`${idPrefix}-upload-files`}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  disabled={disabled}
-                  onChange={(e) => onFileSelection(setter, e)}
-                />
-                <input
-                  id={`${idPrefix}-upload-files-add`}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  disabled={disabled}
-                  onChange={(e) => onFileSelection(setter, e, { append: true })}
-                />
-                {files.length === 0 && (
-                  <>
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                    style={{ backgroundColor: "rgba(0,0,0,0.04)", color: "var(--color-brand-primary)" }}
-                    aria-hidden="true"
-                  >
-                    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 16V4" />
-                      <path d="M7 9l5-5 5 5" />
-                      <path d="M4 20h16" />
-                    </svg>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={(e) => {
-                      if (disabled) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                      }
-                      document.getElementById(`${idPrefix}-upload-files`)?.click();
-                    }}
-                    className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
-                    style={{ backgroundColor: "var(--color-brand-primary)" }}
-                  >
-                    Browse
-                  </button>
-                  <p className="m-0 mt-2 text-xs text-gray-500">Maximum total size {MAX_FILE_SIZE_LABEL}</p>
-                  </>
-                )}
-              </div>
-
-              {files.length > 0 && (() => {
-                const totalSize = getFilesTotalSize(files);
-                const atLimit = totalSize >= MAX_FILE_SIZE;
-                return (
-                  <div className="w-full text-left rounded-2xl border bg-white p-4 sm:p-5" style={{ borderColor: "var(--color-border-primary)" }}>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
-                        <svg viewBox="0 0 20 20" className="w-5 h-5" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        {files.length} file{files.length > 1 ? "s" : ""} selected
-                      </div>
-                      <div className="text-xs sm:text-sm font-medium text-gray-600">
-                        Total: <span className={totalSize > MAX_FILE_SIZE ? "text-red-600 font-semibold" : "text-gray-900 font-semibold"}>{formatFileSize(totalSize)}</span>
-                        <span className="text-gray-400"> / {MAX_FILE_SIZE_LABEL}</span>
-                      </div>
-                    </div>
-
-                    <div className="max-h-72 overflow-y-auto pr-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {files.map((file, idx) => {
-                          const name = file.name || file.filename || "file";
-                          const size = file instanceof File ? file.size : Number(file.size ?? 0);
-                          return (
-                            <div
-                              key={`${name}-${idx}-${size}`}
-                              className="group flex items-start gap-3 rounded-xl border bg-gray-50/70 p-3 sm:p-3.5 min-w-0"
-                              style={{ borderColor: "var(--color-border-primary)" }}
-                              title={name}
-                            >
-                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white border text-gray-600 shadow-sm" style={{ borderColor: "var(--color-border-primary)" }} aria-hidden="true">
-                                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                  <path d="M14 2v6h6" />
-                                </svg>
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="m-0 text-sm font-semibold text-gray-900 leading-snug break-words line-clamp-3">
-                                  {name}
-                                </p>
-                                <p className="m-0 mt-1 text-xs text-gray-500">
-                                  {formatFileSize(size)}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                disabled={disabled}
-                                onClick={() => onRemoveFile(setter, idx)}
-                                className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white text-gray-500 transition-colors ${disabled ? "opacity-50 cursor-not-allowed" : "hover:text-red-600 hover:border-red-200 hover:bg-red-50 cursor-pointer"}`}
-                                style={{ borderColor: "var(--color-border-primary)" }}
-                                aria-label={`Remove ${name}`}
-                                title="Remove file"
-                              >
-                                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor" aria-hidden="true">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex justify-center sm:justify-end">
-                      <button
-                        type="button"
-                        onClick={() => onAddMoreFiles(idPrefix, files, disabled)}
-                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${atLimit ? "opacity-50" : "hover:bg-gray-50"}`}
-                        style={{ borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" }}
-                        aria-label="Add more files"
-                      >
-                        <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                        </svg>
-                        Add more
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
 const Upload = () => {
   const { user, loading: authLoading, isGuest } = useAuth();
   const navigate = useNavigate();
   const { ShowSnackBar } = useSnack();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("lessons");
-  const lastSnackRef = useRef({ message: "", at: 0 });
+  const [cool, setCool] = useState(false);
 
   const handelSnack = (msg, ty) => {
-    const now = Date.now();
-    const last = lastSnackRef.current;
-    if (last.message === msg && now - last.at < 1000) return;
-    lastSnackRef.current = { message: msg, at: now };
-    ShowSnackBar(msg, ty);
+    if (!cool) {
+      setCool(true);
+      ShowSnackBar(msg, ty);
+      setTimeout(() => {
+        setCool(false);
+      }, 5000);
+    }
   };
 
   const [lessonData, setLessonData] = useState(() => ({ ...emptyLesson(), userid: user?.id || "" }));
@@ -561,18 +272,13 @@ const Upload = () => {
   const [assignmentData, setAssignmentData] = useState(() => ({ ...emptyAssignment(), userid: user?.id || "" }));
 
   useEffect(() => {
-    if (user?.id) {
-      setLessonData((prev) => ({ ...prev, userid: user.id }));
-      setQuizData((prev) => ({ ...prev, userid: user.id }));
-      setMeetingData((prev) => ({ ...prev, userid: user.id }));
-      setAssignmentData((prev) => ({ ...prev, userid: user.id }));
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
     if (authLoading) return;
     if (!user) {
       navigate("/login", { replace: true });
+      return;
+    }
+    if (String(user.role ?? "").toLowerCase() === "guest") {
+      navigate("/", { replace: true });
     }
   }, [user, navigate, authLoading]);
 
@@ -618,7 +324,10 @@ const Upload = () => {
     setLoading(true);
 
     try {
-      const submission = buildSubmissionData({ ...lessonData, userid: user?.id || lessonData.userid });
+      const submission = buildSubmissionData(
+        { ...lessonData, userid: user?.id || lessonData.userid },
+        { includeType: true },
+      );
 
       const response = await api.post("/Upload", submission, {
         withCredentials: true,
@@ -665,7 +374,10 @@ const Upload = () => {
     setLoading(true);
 
     try {
-      const submission = buildSubmissionData({ ...quizData, userid: user?.id || quizData.userid });
+      const submission = buildSubmissionData(
+        { ...quizData, userid: user?.id || quizData.userid },
+        { dateField: "QuizDate" },
+      );
       
       const response = await api.post("/Quizzes", submission, {
         withCredentials: true,
@@ -716,7 +428,7 @@ const Upload = () => {
     try {
       const submission = buildSubmissionData(
         { ...meetingData, userid: user?.id || meetingData.userid },
-        { allowDocuments: false },
+        { allowDocuments: false, dateField: "OnlineMeetingDate" },
       );
       const response = await api.post("/OnlineMeeting", submission, {
         withCredentials: true,
@@ -770,7 +482,10 @@ const Upload = () => {
     setLoading(true);
 
     try {
-      const submission = buildSubmissionData({ ...assignmentData, userid: user?.id || assignmentData.userid });
+      const submission = buildSubmissionData(
+        { ...assignmentData, userid: user?.id || assignmentData.userid },
+        { dateField: "deadline" },
+      );
       const response = await api.post(`/assignment/${userId}`, submission, {
         withCredentials: true,
       });
@@ -787,7 +502,12 @@ const Upload = () => {
     }
   };
 
-  if (authLoading || !user || user.role === "student") {
+  if (
+    authLoading ||
+    !user ||
+    user.role === "student" ||
+    String(user.role ?? "").toLowerCase() === "guest"
+  ) {
     return null;
   }
 
@@ -939,8 +659,8 @@ const Upload = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Upload
         </h1>
@@ -949,7 +669,7 @@ const Upload = () => {
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full">
+      <div className="w-full">
         <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
           {tabButton("lessons", "Lessons")}
           {tabButton("quizzes", "Quizzes/Exams")}

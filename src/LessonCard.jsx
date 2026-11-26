@@ -1,5 +1,5 @@
-import React from "react";
 import { FiArchive, FiFile, FiFileText, FiLink, FiMusic, FiVideo } from "react-icons/fi";
+import DocxPreview from "./DocxPreview";
 
 const VIDEO_PREVIEW_EXTS = ["mp4", "mov", "webm", "mkv", "avi", "ogg", "wmv"];
 const ARCHIVE_PREVIEW_EXTS = ["zip", "rar", "7z", "tar", "gz", "bz2", "iso"];
@@ -54,6 +54,8 @@ const LessonCard = ({
   previewKind = "file",
   previewLabel = "",
   previewSource = "",
+  previewBlob = null,
+  previewFileName = "",
 }) => {
   const displayDescription =
     description === null || description === undefined ? "" : description;
@@ -62,7 +64,8 @@ const LessonCard = ({
   const previewTypeLabel = previewLabel ? String(previewLabel).toUpperCase() : "FILE";
   const PreviewIcon = getPreviewIcon(previewLabel);
   const hasImage = typeof image === "string" && image.trim() !== "";
-  const previewFileName = getFileNameFromUrl(previewSource);
+  // The API ships the document name, which is more reliable than the URL key.
+  const fileName = previewFileName || getFileNameFromUrl(previewSource);
   const effectivePreviewStatus =
     previewStatus === "image" && !hasImage ? "unavailable" : previewStatus;
   const placeholder = (() => {
@@ -103,7 +106,16 @@ const LessonCard = ({
         className="relative flex-shrink-0 h-1/2 overflow-hidden"
         style={{ borderBottom: "1px solid var(--color-border-primary)" }}
       >
-        {effectivePreviewStatus === "image" ? (
+        {effectivePreviewStatus === "docx" && previewBlob ? (
+          <div className="w-full h-full bg-white overflow-hidden pointer-events-none select-none">
+            <DocxPreview
+              blob={previewBlob}
+              fit="container"
+              lazy
+              className="w-full h-full"
+            />
+          </div>
+        ) : effectivePreviewStatus === "image" ? (
           <img
             src={image}
             alt={title}
@@ -115,7 +127,7 @@ const LessonCard = ({
         ) : effectivePreviewStatus === "unavailable" ||
           effectivePreviewStatus === "content" ? (
           <div
-            className="w-full h-full flex flex-col items-center justify-center gap-2 px-4 text-center bg-gradient-to-br from-slate-100 via-white to-indigo-50"
+            className="w-full h-full flex flex-col items-center justify-center gap-2 px-4 text-center bg-white"
             title={previewSource || undefined}
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm">
@@ -128,9 +140,9 @@ const LessonCard = ({
               <span className="text-[11px] text-gray-500 max-w-[220px] break-words">
                 {placeholder.message}
               </span>
-              {previewFileName && (
+              {fileName && (
                 <span className="text-[10px] text-gray-400 max-w-[220px] truncate w-full">
-                  {previewFileName}
+                  {fileName}
                 </span>
               )}
             </div>

@@ -1,5 +1,3 @@
-import React from "react";
-
 /**
  * Base skeleton block.
  * Uses the `.skeleton` shimmer animation defined in index.css.

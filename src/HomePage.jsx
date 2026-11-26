@@ -8,6 +8,13 @@ import { LessonCardSkeleton } from "./Skeleton";
 import api from "./AxiosHelper";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useAuth } from "./AuthContext";
+import { pickField, toSavedDocs } from "./contentUtils";
+import {
+  guestAssignments,
+  guestLessons,
+  guestMeetings,
+  guestQuizzes,
+} from "./props";
 import axios from "axios";
 
 // Preview files live in the same cloud storage as lesson files, so they are
@@ -15,6 +22,7 @@ import axios from "axios";
 const previewClient = axios.create();
 
 const IMAGE_PREVIEW_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"];
+const DOCX_PREVIEW_EXTS = ["docx", "doc"];
 
 const getPreviewExt = (value) => {
   if (typeof value !== "string" || !value) return "";
@@ -62,20 +70,125 @@ const pickUrlValue = (value) => {
   return "";
 };
 
-// A lesson without a preview url has no documents, so its content is either a
-// link or a text paragraph; when neither field can be read the paragraph is the
-// one that is left, so the card still advertises text content.
-const getLessonContentKind = (lesson) => {
-  const link = pickUrlValue(getLessonFieldValue(lesson, ["link", "uploadlink", "lessonlink"]));
-  if (link) return "link";
-  return "text";
+// Documents arrive as descriptors: [{ filename, size, content_type }].
+const getLessonDocs = (lesson) => toSavedDocs(pickField(lesson, "files", "docs", "UploadFiles"));
+
+const getDocLabel = (doc) => {
+  const name = String(doc?.filename ?? "");
+  const dot = name.lastIndexOf(".");
+  if (dot >= 0 && dot < name.length - 1) return name.slice(dot + 1).toLowerCase();
+  const type = String(doc?.content_type ?? "");
+  return type.includes("/") ? type.split("/")[1].toLowerCase() : "";
 };
 
-const getLessonPreviewUrl = (lesson) => pickUrlValue(getLessonFieldValue(lesson, PREVIEW_URL_KEYS));
+const isImageDoc = (doc) => {
+  const type = String(doc?.content_type ?? "");
+  return IMAGE_PREVIEW_EXTS.includes(getDocLabel(doc)) || type.startsWith("image/");
+};
 
-// Returns { status: "image" | "unavailable", url?, sourceUrl, label, isObjectUrl? }
-const loadLessonPreview = async (url) => {
-  const ext = getPreviewExt(url);
+// Storage urls are sent alongside the descriptors, in the same order.
+const getLessonFileUrls = (lesson) => {
+  const value = getLessonFieldValue(lesson, ["filesurls", "fileurls", "filesurl"]);
+  if (Array.isArray(value)) return value.map(pickUrlValue).filter(Boolean);
+  const single = pickUrlValue(value);
+  return single ? [single] : [];
+};
+
+// The declared tab is authoritative, but older payloads omit it, so fall back
+// to the fields that are actually populated. A document lesson must not be
+// advertised as text just because it has no preview image.
+const getLessonContentKind = (lesson, docs) => {
+  const declared = String(
+    pickField(lesson, "UploadContentType", "uploadContentType", "upload_content_type") ?? "",
+  )
+    .trim()
+    .toLowerCase();
+  if (declared === "document" || declared === "documents") return "file";
+  if (declared === "link" || declared === "text") return declared;
+
+  const link = pickUrlValue(getLessonFieldValue(lesson, ["link", "uploadlink", "lessonlink"]));
+  if (link) return "link";
+  if ((docs ?? getLessonDocs(lesson)).length > 0) return "file";
+  const text = pickField(lesson, "text", "UploadText");
+  if (text !== null && text !== undefined && String(text).trim() !== "") return "text";
+  return "empty";
+};
+
+// Only preview sources that can actually render an image are worth fetching:
+// every other file would be a full download for a thumbnail that never shows.
+const isDocxDoc = (doc) => DOCX_PREVIEW_EXTS.includes(getDocLabel(doc));
+
+// Word documents cannot be shown as an <img>, so they get their own source
+// lookup and are rendered with docx-preview instead.
+const getLessonDocxPreview = (lesson) => {
+  const declared = pickUrlValue(getLessonFieldValue(lesson, PREVIEW_URL_KEYS));
+  if (declared && DOCX_PREVIEW_EXTS.includes(getPreviewExt(declared))) {
+    return { url: declared, doc: null };
+  }
+
+  const docs = getLessonDocs(lesson);
+  const urls = getLessonFileUrls(lesson);
+  for (let index = 0; index < docs.length; index += 1) {
+    if (!isDocxDoc(docs[index])) continue;
+    const url = urls[index] || "";
+    if (url) return { url, doc: docs[index] };
+  }
+
+  const firstUrl = urls[0] || "";
+  if (firstUrl && DOCX_PREVIEW_EXTS.includes(getPreviewExt(firstUrl))) {
+    return { url: firstUrl, doc: docs[0] ?? null };
+  }
+  return { url: "", doc: null };
+};
+
+const getLessonPreview = (lesson) => {
+  const declared = pickUrlValue(getLessonFieldValue(lesson, PREVIEW_URL_KEYS));
+  if (declared) return { url: declared, doc: null };
+
+  const docs = getLessonDocs(lesson);
+  const urls = getLessonFileUrls(lesson);
+  for (let index = 0; index < docs.length; index += 1) {
+    if (!isImageDoc(docs[index])) continue;
+    const url = urls[index] || "";
+    const ext = getPreviewExt(url);
+    if (url && (!ext || IMAGE_PREVIEW_EXTS.includes(ext))) {
+      return { url, doc: docs[index] };
+    }
+  }
+
+  const firstUrl = urls[0] || "";
+  if (firstUrl && IMAGE_PREVIEW_EXTS.includes(getPreviewExt(firstUrl))) {
+    return { url: firstUrl, doc: docs[0] ?? null };
+  }
+  return { url: "", doc: null };
+};
+
+// Returns { status: "image" | "docx" | "unavailable", url?, blob?, sourceUrl, label, isObjectUrl? }
+const loadLessonPreview = async (url, label, kind = "auto") => {
+  const ext = getPreviewExt(url) || String(label ?? "").toLowerCase();
+  if (kind === "docx") {
+    try {
+      const res = await previewClient.get(url, { responseType: "blob", timeout: 20000 });
+      if (res.data instanceof Blob) {
+        return {
+          status: "docx",
+          blob: res.data,
+          sourceUrl: url,
+          label: ext || "docx",
+        };
+      }
+      return { status: "unavailable", sourceUrl: url, label: ext || "docx" };
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn(`[lesson preview] FAILED ${url}`, error);
+      }
+      return { status: "unavailable", sourceUrl: url, label: ext || "docx" };
+    }
+  }
+  // A known non-image extension never needs the bytes.
+  if (ext && !IMAGE_PREVIEW_EXTS.includes(ext)) {
+    return { status: "unavailable", sourceUrl: url, label: ext };
+  }
   if (import.meta.env.DEV) {
     console.info(`[lesson preview] GET ${url}`);
   }
@@ -130,6 +243,26 @@ const HomePage = () => {
 
   const isGuest = String(user?.role ?? "").toLowerCase() === "guest";
 
+  // Guests never see live data: the dashboard is populated from the sample
+  // content in props.js while an account with a real role uses the API.
+  const dashboardLessons = isGuest ? guestLessons : lessons;
+  const dashboardQuizzes = isGuest ? guestQuizzes : quizzes;
+  const dashboardMeetings = isGuest ? guestMeetings : meetings;
+  const dashboardAssignments = isGuest ? guestAssignments : assignments;
+  const lessonsLoading = !isGuest && loadingLessons;
+  const quizzesLoading = !isGuest && loadingQuizzes;
+  const meetingsLoading = !isGuest && loadingMeetings;
+  const assignmentsLoading = !isGuest && loadingAssignments;
+
+  const checkScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    setCanScrollLeft(container.scrollLeft > 0);
+    setCanScrollRight(
+      container.scrollLeft + container.clientWidth < container.scrollWidth - 1,
+    );
+  };
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -140,6 +273,7 @@ const HomePage = () => {
 
   useEffect(() => {
     if (loading || !user) return;
+    if (isGuest) return;
     let cancelled = false;
     const fetchLessons = async () => {
       setLoadingLessons(true);
@@ -148,9 +282,6 @@ const HomePage = () => {
         let response;
         if (userId !== undefined && userId !== null && userId !== "") {
           response = await api.get(`/Student/getlatest/${userId}`, { timeout: 15000 });
-
-          console.log(response.data);
-          
         }
         if (cancelled) return;
         const lessonData = response?.data;
@@ -167,17 +298,38 @@ const HomePage = () => {
         previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
         previewUrlsRef.current = [];
         const previewItems = data
-          .map((item, index) => ({
-            key: String(item?.id ?? item?._id ?? index),
-            url: getLessonPreviewUrl(item),
-          }))
-          .filter((item) => item.url);
+          .map((item, index) => {
+            const key = String(item?.id ?? item?._id ?? index);
+            const image = getLessonPreview(item);
+            if (image.url) {
+              return {
+                key,
+                url: image.url,
+                label: getDocLabel(image.doc),
+                kind: "image",
+              };
+            }
+            const docx = getLessonDocxPreview(item);
+            if (docx.url) {
+              return {
+                key,
+                url: docx.url,
+                label: getDocLabel(docx.doc) || getPreviewExt(docx.url),
+                kind: "docx",
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
         setLessonPreviews(
           Object.fromEntries(previewItems.map((item) => [item.key, { status: "loading" }])),
         );
         if (previewItems.length > 0) {
           Promise.all(
-            previewItems.map(async (item) => [item.key, await loadLessonPreview(item.url)]),
+            previewItems.map(async (item) => [
+              item.key,
+              await loadLessonPreview(item.url, item.label, item.kind),
+            ]),
           ).then((results) => {
             if (cancelled) {
               results.forEach(([, result]) => {
@@ -195,7 +347,7 @@ const HomePage = () => {
         setTimeout(() => {
           if (!cancelled) checkScroll();
         }, 100);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setLessons([]);
           setShowSeeMore(false);
@@ -211,10 +363,11 @@ const HomePage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, loading]);
+  }, [user, loading, isGuest]);
 
   useEffect(() => {
     if (loading || !user) return;
+    if (isGuest) return;
     let cancelled = false;
     const fetchQuizzes = async () => {
       setLoadingQuizzes(true);
@@ -232,7 +385,7 @@ const HomePage = () => {
         }
         const data = Array.isArray(quizData) ? quizData : quizData ? [quizData] : [];
         setQuizzes(data);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setQuizzes([]);
         }
@@ -247,10 +400,11 @@ const HomePage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, loading]);
+  }, [user, loading, isGuest]);
 
   useEffect(() => {
     if (loading || !user) return;
+    if (isGuest) return;
     let cancelled = false;
     const fetchMeetings = async () => {
       setLoadingMeetings(true);
@@ -268,7 +422,7 @@ const HomePage = () => {
         }
         const data = Array.isArray(meetingData) ? meetingData : meetingData ? [meetingData] : [];
         setMeetings(data);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setMeetings([]);
         }
@@ -283,10 +437,11 @@ const HomePage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, loading]);
+  }, [user, loading, isGuest]);
 
   useEffect(() => {
     if (loading || !user) return;
+    if (isGuest) return;
     let cancelled = false;
     const fetchAssignments = async () => {
       setLoadingAssignments(true);
@@ -304,7 +459,7 @@ const HomePage = () => {
         }
         const data = Array.isArray(assignmentData) ? assignmentData : assignmentData ? [assignmentData] : [];
         setAssignments(data);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setAssignments([]);
         }
@@ -319,16 +474,7 @@ const HomePage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, loading]);
-
-  const checkScroll = () => {
-    if (!scrollContainerRef.current) return;
-    const container = scrollContainerRef.current;
-    setCanScrollLeft(container.scrollLeft > 0);
-    setCanScrollRight(
-      container.scrollLeft + container.clientWidth < container.scrollWidth - 1,
-    );
-  };
+  }, [user, loading, isGuest]);
 
   const handleScroll = (direction) => {
     if (!scrollContainerRef.current) return;
@@ -364,7 +510,7 @@ const HomePage = () => {
       container.addEventListener("scroll", checkScroll);
       return () => container.removeEventListener("scroll", checkScroll);
     }
-  }, [lessons]);
+  }, [dashboardLessons]);
 
   return (
     <div className="space-y-8">
@@ -381,13 +527,13 @@ const HomePage = () => {
 
       {isGuest && (
         <div
-          className="rounded-xl px-4 py-3 sm:px-5 sm:py-4"
+          className="rounded-xl border bg-white px-4 py-3 sm:px-5 sm:py-4"
           style={{
-            backgroundColor: "rgba(251, 191, 36, 0.18)",
-            border: "1px solid #f59e0b",
+            borderColor: "var(--color-border-primary)",
+            borderLeft: "4px solid #91b141",
           }}
         >
-          <p className="m-0 text-sm sm:text-base font-medium text-amber-600">
+          <p className="m-0 text-sm sm:text-base font-medium text-gray-700">
             As a guest user you will be authorized to read and preveiw pages only and you can't perform any actions
           </p>
         </div>
@@ -405,7 +551,7 @@ const HomePage = () => {
         <div className="flex items-center gap-3 w-full">
           <button
             onClick={() => handleScroll("left")}
-            className={`flex-shrink-0 p-2.5 rounded-full border bg-white transition-all ${canScrollLeft ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+            className={`hidden sm:inline-flex flex-shrink-0 p-2.5 rounded-full border bg-white transition-all ${canScrollLeft ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
             style={{ borderColor: "var(--color-border-primary)" }}
             aria-label="Previous lessons"
             disabled={!canScrollLeft}
@@ -419,7 +565,7 @@ const HomePage = () => {
             className="flex-1 w-full overflow-x-auto overflow-y-hidden flex gap-4 scroll-smooth [&::-webkit-scrollbar]:hidden py-1"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
-            {loadingLessons ? (
+            {lessonsLoading ? (
               Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={`lesson-skeleton-${index}`}
@@ -428,22 +574,34 @@ const HomePage = () => {
                   <LessonCardSkeleton />
                 </div>
               ))
-            ) : lessons.length > 0 ? (
-              lessons.map((lesson, i) => {
+            ) : dashboardLessons.length > 0 ? (
+              dashboardLessons.map((lesson, i) => {
                 const previewKey = String(lesson?.id ?? lesson?._id ?? i);
+                const previewSource = getLessonPreview(lesson);
+                const docxSource = getLessonDocxPreview(lesson);
                 const preview =
                   lessonPreviews[previewKey] ||
-                  (getLessonPreviewUrl(lesson) ? { status: "loading" } : null);
+                  (previewSource.url || docxSource.url
+                    ? { status: "loading" }
+                    : null);
                 const fallbackImage =
                   typeof lesson?.image === "string" && lesson.image.trim() !== ""
                     ? lesson.image
                     : "";
+                const docs = getLessonDocs(lesson);
+                const firstDoc = docs[0] ?? null;
+                const contentKind = getLessonContentKind(lesson, docs);
                 const previewStatus = preview
                   ? preview.status
                   : fallbackImage
                     ? "image"
                     : "content";
-                const previewKind = preview ? "file" : getLessonContentKind(lesson);
+                const previewKind =
+                  preview?.status === "docx"
+                    ? "file"
+                    : contentKind === "empty" && preview
+                      ? "file"
+                      : contentKind;
                 return (
                   <div
                     key={lesson.id || lesson._id || i}
@@ -474,8 +632,19 @@ const HomePage = () => {
                       }
                       previewStatus={previewStatus}
                       previewKind={previewKind}
-                      previewLabel={preview?.label || ""}
-                      previewSource={preview?.sourceUrl || getLessonPreviewUrl(lesson)}
+                      previewLabel={preview?.label || getDocLabel(firstDoc)}
+                      previewSource={
+                        preview?.sourceUrl ||
+                        previewSource.url ||
+                        docxSource.url
+                      }
+                      previewBlob={preview?.status === "docx" ? preview.blob : null}
+                      previewFileName={
+                        previewSource.doc?.filename ||
+                        docxSource.doc?.filename ||
+                        firstDoc?.filename ||
+                        ""
+                      }
                       truncateTitle
                       truncateNotes
                     />
@@ -490,7 +659,7 @@ const HomePage = () => {
                 No lessons available
               </div>
             )}
-            {showSeeMore && lessons.length >= 5 && (
+            {(isGuest || showSeeMore) && dashboardLessons.length >= 5 && (
               <div
                 className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] h-64 flex items-center justify-center bg-gray-50 border rounded-2xl"
                 style={{ borderColor: "var(--color-border-primary)" }}
@@ -508,7 +677,7 @@ const HomePage = () => {
 
           <button
             onClick={() => handleScroll("right")}
-            className={`flex-shrink-0 p-2.5 rounded-full border bg-white transition-all ${canScrollRight ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+            className={`hidden sm:inline-flex flex-shrink-0 p-2.5 rounded-full border bg-white transition-all ${canScrollRight ? "hover:bg-gray-50 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
             style={{ borderColor: "var(--color-border-primary)" }}
             aria-label="Next lessons"
             disabled={!canScrollRight}
@@ -519,9 +688,24 @@ const HomePage = () => {
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-        <QuizExamCard quizzes={quizzes || []} loading={loadingQuizzes} truncateTitles />
-        <AssignmentCard assignments={assignments || []} loading={loadingAssignments} truncateTitles />
-        <OnlineMeetingCard meetings={meetings || []} loading={loadingMeetings} truncateTitles />
+        <QuizExamCard
+          quizzes={dashboardQuizzes || []}
+          loading={quizzesLoading}
+          truncateTitles
+          readOnly={isGuest}
+        />
+        <AssignmentCard
+          assignments={dashboardAssignments || []}
+          loading={assignmentsLoading}
+          truncateTitles
+          readOnly={isGuest}
+        />
+        <OnlineMeetingCard
+          meetings={dashboardMeetings || []}
+          loading={meetingsLoading}
+          truncateTitles
+          readOnly={isGuest}
+        />
       </div>
     </div>
   );

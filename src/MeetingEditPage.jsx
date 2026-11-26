@@ -4,6 +4,12 @@ import { useAuth } from "./AuthContext";
 import api from "./AxiosHelper";
 import { useSnack } from "./SnackBarContext.jsx";
 import { FormSkeleton } from "./Skeleton";
+import ContentSection from "./ContentSection.jsx";
+import {
+  MEETING_CONTENT_TYPES,
+  buildContentPayload,
+  pickField,
+} from "./contentUtils.js";
 
 const SUBJECTS = [
   "Math",
@@ -34,57 +40,36 @@ const DIVISIONS_BY_FACULTY = {
 const YEARS = ["1", "2", "3", "4"];
 const SEMESTERS = ["first", "second"];
 
+const asText = (value) => (value === null || value === undefined ? "" : String(value));
+
 // Online meetings never support documents, only a link or text content.
-const CONTENT_TYPES = ["link", "text"];
-const OPTIONAL_FIELDS = ["notes", "description", "UploadLink", "UploadText"];
-
 const normalizeContentData = (data = {}) => {
-  const declared = String(data.UploadContentType || "").trim().toLowerCase();
-  const type = declared === "text" || data.UploadText || data.text ? "text" : "link";
+  const declared = asText(
+    pickField(data, "UploadContentType", "uploadContentType", "upload_content_type"),
+  )
+    .trim()
+    .toLowerCase();
+  const link = asText(pickField(data, "UploadLink", "link"));
+  const text = asText(pickField(data, "UploadText", "text"));
+  const type = declared === "text" || text ? "text" : "link";
+  const semester = asText(pickField(data, "semester")).trim().toLowerCase();
 
+  // Responses mix casings (`faculty`/`Faculty`), so the shared fields are read
+  // through `pickField`; otherwise they arrive as blank selects.
   return {
     ...data,
+    title: asText(pickField(data, "title")),
+    faculty: asText(pickField(data, "faculty")),
+    division: asText(pickField(data, "division")),
+    subject: asText(pickField(data, "subject")),
+    year: asText(pickField(data, "year")),
+    semester: SEMESTERS.includes(semester) ? semester : "",
+    notes: asText(pickField(data, "notes", "description")),
     UploadContentType: type,
-    UploadLink: type === "link" ? (data.UploadLink ?? data.link ?? "") : null,
-    UploadText: type === "text" ? (data.UploadText ?? data.text ?? "") : null,
+    UploadLink: type === "link" ? link : null,
+    UploadText: type === "text" ? text : null,
     UploadFiles: null,
   };
-};
-
-const preparePayload = (data) => {
-  const payload = {};
-  Object.entries(data).forEach(([key, value]) => {
-    if (value === null || value === undefined) return;
-    if (Array.isArray(value)) {
-      payload[key] = value;
-      return;
-    }
-    if (typeof value !== "string") {
-      payload[key] = value;
-      return;
-    }
-    const cleaned = value.trim();
-    if (cleaned === "" && OPTIONAL_FIELDS.includes(key)) return;
-    payload[key] = cleaned;
-  });
-  return payload;
-};
-
-// Builds the plain JSON body the API expects. Only the properties of the
-// selected content tab get a value; the other one is sent as null.
-const buildSubmissionData = (data) => {
-  const payload = preparePayload(data);
-  const type = data.UploadContentType === "text" ? "text" : "link";
-
-  payload.UploadLink = type === "link" ? String(data.UploadLink ?? "").trim() : null;
-  payload.UploadText = type === "text" ? String(data.UploadText ?? "").trim() : null;
-  // UploadContentType names the selected tab; meetings only support link/text.
-  payload.UploadContentType = type;
-
-  delete payload.docs;
-  delete payload.UploadFiles;
-
-  return payload;
 };
 
 const MeetingEditPage = () => {
@@ -93,6 +78,17 @@ const MeetingEditPage = () => {
   const location = useLocation();
   const { user, isGuest } = useAuth();
   const { ShowSnackBar } = useSnack();
+  const [cool, setCool] = useState(false);
+
+  const handelSnack = (msg, ty) => {
+    if (!cool) {
+      setCool(true);
+      ShowSnackBar(msg, ty);
+      setTimeout(() => {
+        setCool(false);
+      }, 5000);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!location.state?.meeting);
 
@@ -123,7 +119,7 @@ const MeetingEditPage = () => {
           setFormData(empty);
           setInitialData(empty);
         }
-      } catch (err) {
+      } catch {
         const empty = normalizeContentData({});
         setFormData(empty);
         setInitialData(empty);
@@ -132,12 +128,10 @@ const MeetingEditPage = () => {
       }
     };
 
+    // The form state is already seeded from location.state on mount, so only
+    // fetch when the page was opened directly by URL.
     if (!location.state?.meeting) {
       fetchData();
-    } else {
-      const normalized = normalizeContentData(location.state?.meeting || {});
-      setFormData(normalized);
-      setInitialData(normalized);
     }
   }, [user, navigate, id, location.state]);
 
@@ -161,25 +155,25 @@ const MeetingEditPage = () => {
     e.preventDefault();
     if (isGuest) return;
     if (!formData.title?.trim()) {
-      ShowSnackBar("Title is required.", "warn");
+      handelSnack("Title is required.", "warn");
       return;
     }
     if (String(formData.title ?? "").length > 100) {
-      ShowSnackBar("Title must be at most 100 characters.", "warn");
+      handelSnack("Title must be at most 100 characters.", "warn");
       return;
     }
     const notesVal = formData.notes || formData.description || "";
     if (notesVal && String(notesVal).length > 400) {
-      ShowSnackBar("Notes must be at most 400 characters.", "warn");
+      handelSnack("Notes must be at most 400 characters.", "warn");
       return;
     }
     const contentType = formData.UploadContentType || "link";
     if (contentType === "link" && !String(formData.UploadLink || "").trim()) {
-      ShowSnackBar("Please provide a link.", "warn");
+      handelSnack("Please provide a link.", "warn");
       return;
     }
     if (contentType === "text" && !String(formData.UploadText || "").trim()) {
-      ShowSnackBar("Please provide text content.", "warn");
+      handelSnack("Please provide text content.", "warn");
       return;
     }
 
@@ -190,7 +184,7 @@ const MeetingEditPage = () => {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         if (selectedDate < todayStart) {
-          ShowSnackBar("Please select today or a future date and time for the online meeting.", "warn");
+          handelSnack("Please select today or a future date and time for the online meeting.", "warn");
           return;
         }
       }
@@ -198,19 +192,23 @@ const MeetingEditPage = () => {
 
     setLoading(true);
     try {
-      const submission = buildSubmissionData(formData);
-      if (dateVal) {
-        submission.OnlineMeetingDate = dateVal;
-        submission.meetingDate = dateVal;
-        submission.date = dateVal;
-      }
+      const userId =
+        user?.id || user?.userId || user?._id || user?.Id || user?.userID || "";
+      const submission = buildContentPayload(
+        {
+          ...formData,
+          userid: formData.userid || userId,
+          OnlineMeetingDate: dateVal,
+        },
+        { allowDocuments: false, dateField: "OnlineMeetingDate" },
+      );
       await api.put(`/OnlineMeeting/${id}`, submission, { withCredentials: true });
-      ShowSnackBar("Meeting updated successfully.", "success");
+      handelSnack("Meeting updated successfully.", "success");
       navigate(`/meeting/${id}`, { state: { meeting: { ...formData, ...(dateVal ? { OnlineMeetingDate: dateVal } : {}) } } });
     } catch (err) {
       const serverMsg =
         err?.response?.data?.message ?? err?.response?.data?.error ?? null;
-      ShowSnackBar(serverMsg || "Failed to update meeting.", "error");
+      handelSnack(serverMsg || "Failed to update meeting.", "error");
     } finally {
       setLoading(false);
     }
@@ -299,7 +297,15 @@ const MeetingEditPage = () => {
     </select>
   );
   const getMeetingDateValue = () => {
-    const raw = formData.OnlineMeetingDate || formData.meetingDate || formData.date || formData.OnlineMeeting_Time || formData.meeting_time || "";
+    const raw =
+      pickField(
+        formData,
+        "OnlineMeetingDate",
+        "OnlineMeeting_Time",
+        "meetingDate",
+        "meeting_time",
+        "date",
+      ) ?? "";
     if (!raw) return "";
 
     const toDateTimeLocal = (date) => {
@@ -351,44 +357,11 @@ const MeetingEditPage = () => {
     setFormData((prev) => ({
       ...prev,
       UploadContentType: type === "text" ? "text" : "link",
-      UploadLink: type === "link" ? (prev.UploadLink ?? "") : null,
-      UploadText: type === "text" ? (prev.UploadText ?? "") : null,
+      // Preserve content across tab switches so accidental changes don't wipe data.
+      UploadLink: prev.UploadLink ?? "",
+      UploadText: prev.UploadText ?? "",
       UploadFiles: null,
     }));
-  };
-
-  const renderContentSection = () => {
-    const type = formData.UploadContentType || "link";
-    const tabBase = "px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors";
-    const activeStyle = { backgroundColor: "var(--color-brand-primary)", color: "#ffffff", borderColor: "var(--color-brand-primary)" };
-    const inactiveStyle = { borderColor: "var(--color-border-primary)", color: "var(--color-text-primary, #111827)", backgroundColor: "#ffffff" };
-    return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {CONTENT_TYPES.map((option) => {
-            const active = type === option;
-            const label = option === "link" ? "Link" : option === "text" ? "Text" : "Documents";
-            return (
-              <button key={option} type="button" onClick={() => setContentType(option)} className={`${tabBase} cursor-pointer`} style={active ? activeStyle : inactiveStyle}>
-                {label}
-              </button>
-            );
-          })}
-        </div>
-        {type === "link" && (
-          <div>
-            <label htmlFor="meeting-upload-link" className={labelClass}>Link <span className="text-red-500">*</span></label>
-            <input id="meeting-upload-link" name="UploadLink" type="url" disabled={isGuest} readOnly={isGuest} value={formData.UploadLink || ""} onChange={(e) => setFormData((prev) => ({ ...prev, UploadLink: e.target.value }))} placeholder="https://example.com/resource" className={inputClass} style={fieldStyle} required={!isGuest} />
-          </div>
-        )}
-        {type === "text" && (
-          <div>
-            <label htmlFor="meeting-upload-text" className={labelClass}>Text <span className="text-red-500">*</span></label>
-            <textarea id="meeting-upload-text" name="UploadText" disabled={isGuest} readOnly={isGuest} value={formData.UploadText || ""} onChange={(e) => setFormData((prev) => ({ ...prev, UploadText: e.target.value }))} placeholder="Enter text content..." rows={6} className={`${inputClass} resize-none overflow-y-auto`} style={{ ...fieldStyle, minHeight: "160px" }} required={!isGuest} />
-          </div>
-        )}
-      </div>
-    );
   };
 
   const hasChanges = () => {
@@ -423,15 +396,15 @@ const MeetingEditPage = () => {
   const isDirty = hasChanges();
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Edit Online Meeting
         </h1>
         <p className="m-0 mt-2 text-sm sm:text-base text-gray-500">Update online meeting details</p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full">
+      <div className="w-full">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div
             className="bg-white border rounded-2xl p-6 sm:p-8"
@@ -455,7 +428,14 @@ const MeetingEditPage = () => {
                 />
               </div>
 
-              {renderContentSection()}
+              <ContentSection
+                data={formData}
+                setter={setFormData}
+                idPrefix="meeting"
+                disabled={isGuest}
+                allowedTypes={MEETING_CONTENT_TYPES}
+                onSetContentType={(_setter, type) => setContentType(type)}
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>

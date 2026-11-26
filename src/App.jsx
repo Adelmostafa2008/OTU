@@ -18,6 +18,7 @@ import LessonDetailsPage from "./LessonDetailsPage";
 import QuizEditPage from "./QuizEditPage";
 import MeetingEditPage from "./MeetingEditPage";
 import AssignmentEditPage from "./AssignmentEditPage";
+import LessonEditPage from "./LessonEditPage";
 import ChangePassword from "./ChangePassword";
 import { useAuth } from "./AuthContext";
 
@@ -59,8 +60,8 @@ const AppContent = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      <div className="pl-[220px]">
-        <main className="min-h-screen pb-20">
+      <div className="pt-14 lg:pl-[220px] lg:pt-0">
+        <main className="min-h-[calc(100vh-3.5rem)] pb-20 lg:min-h-screen">
           <div className="page-shell">
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -91,7 +92,7 @@ const AppContent = () => {
               <Route
                 path="/upload"
                 element={
-                  <ProtectedRoute allowedRoles={["instructor", "admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["instructor", "admin"]}>
                     <Upload />
                   </ProtectedRoute>
                 }
@@ -99,7 +100,7 @@ const AppContent = () => {
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminDashboard />
                   </ProtectedRoute>
                 }
@@ -107,7 +108,7 @@ const AppContent = () => {
               <Route
                 path="/add-user"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <AddUser />
                   </ProtectedRoute>
                 }
@@ -115,7 +116,7 @@ const AppContent = () => {
               <Route
                 path="/add-student"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <Navigate to="/add-user" replace />
                   </ProtectedRoute>
                 }
@@ -177,9 +178,17 @@ const AppContent = () => {
                 }
               />
               <Route
+                path="/lesson/:id/edit"
+                element={
+                  <ProtectedRoute allowedRoles={["instructor", "admin"]} deniedRoles={["guest"]}>
+                    <LessonEditPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/quiz/:id/edit"
                 element={
-                  <ProtectedRoute allowedRoles={["instructor", "admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["instructor", "admin"]} deniedRoles={["guest"]}>
                     <QuizEditPage />
                   </ProtectedRoute>
                 }
@@ -187,7 +196,7 @@ const AppContent = () => {
               <Route
                 path="/meeting/:id/edit"
                 element={
-                  <ProtectedRoute allowedRoles={["instructor", "admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["instructor", "admin"]} deniedRoles={["guest"]}>
                     <MeetingEditPage />
                   </ProtectedRoute>
                 }
@@ -195,7 +204,7 @@ const AppContent = () => {
               <Route
                 path="/assignment/:id/edit"
                 element={
-                  <ProtectedRoute allowedRoles={["instructor", "admin", "guest"]}>
+                  <ProtectedRoute allowedRoles={["instructor", "admin"]} deniedRoles={["guest"]}>
                     <AssignmentEditPage />
                   </ProtectedRoute>
                 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "./AxiosHelper";
 import { useAuth } from "./AuthContext";
 import { ListRowSkeleton } from "./Skeleton";
+import { guestMeetings } from "./props";
 
 const PAGE_SIZE = 12;
 
@@ -54,7 +55,7 @@ const extractTotalPages = (payload, itemsLength, page) => {
 
 const AllMeetingsPage = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isGuest } = useAuth();
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -62,20 +63,10 @@ const AllMeetingsPage = () => {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setMeetings([]);
-      setLoading(false);
-      setTotalPages(1);
-      return;
-    }
+    if (isGuest || !user) return;
 
     const userId = user?.id || user?.userId || user?._id;
-    if (userId === undefined || userId === null || userId === "") {
-      setMeetings([]);
-      setLoading(false);
-      setTotalPages(1);
-      return;
-    }
+    if (userId === undefined || userId === null || userId === "") return;
 
     let cancelled = false;
     const fetchMeetings = async () => {
@@ -90,7 +81,7 @@ const AllMeetingsPage = () => {
         const items = extractItems(payload);
         setMeetings(items);
         setTotalPages(extractTotalPages(payload, items.length, page));
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setMeetings([]);
           setTotalPages(Math.max(1, page));
@@ -106,11 +97,14 @@ const AllMeetingsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading, page]);
+  }, [user, authLoading, page, isGuest]);
+
+  const displayMeetings = isGuest ? guestMeetings : meetings;
+  const showLoading = !isGuest && (authLoading || (loading && !!user));
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Online Meetings
         </h1>
@@ -119,12 +113,12 @@ const AllMeetingsPage = () => {
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full space-y-3">
-        {loading || authLoading ? (
+      <div className="w-full space-y-3">
+        {showLoading ? (
           Array.from({ length: 5 }).map((_, index) => (
             <ListRowSkeleton key={`meeting-row-skeleton-${index}`} />
           ))
-        ) : meetings.length === 0 ? (
+        ) : displayMeetings.length === 0 ? (
           <div
             className="w-full bg-white border rounded-2xl px-5 py-8 text-sm text-gray-500 text-center"
             style={{ borderColor: "var(--color-border-primary)", boxShadow: "var(--shadow-card)" }}
@@ -132,10 +126,11 @@ const AllMeetingsPage = () => {
             No online meetings added yet
           </div>
         ) : (
-          meetings.map((item, index) => {
+          displayMeetings.map((item, index) => {
             const id = item.id || item._id || `${page}-${index}`;
             const title = item.title || item.name || "Untitled Meeting";
-            const date = item.date || item.meetingDate || item.OnlineMeetingDate || "";
+            const date =
+              item.meetingdate || item.date || item.meetingDate || item.OnlineMeetingDate || "";
             const formatted = formatMeetingDateTime(date);
             const description = item.description || item.notes || null;
 
@@ -177,7 +172,7 @@ const AllMeetingsPage = () => {
           })
         )}
 
-        {!loading && !authLoading && (meetings.length > 0 || page > 1) ? (
+        {!showLoading && !isGuest && (displayMeetings.length > 0 || page > 1) ? (
           <div className="flex items-center justify-between gap-3 pt-2">
             <button
               type="button"

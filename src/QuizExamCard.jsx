@@ -24,7 +24,12 @@ const formatDateDisplay = (dateString) => {
   return date.toLocaleDateString(undefined, options);
 };
 
-const QuizExamCard = ({ quizzes = [], loading = false, truncateTitles = false }) => {
+const QuizExamCard = ({
+  quizzes = [],
+  loading = false,
+  truncateTitles = false,
+  readOnly = false,
+}) => {
   const navigate = useNavigate();
   const displayItems = Array.isArray(quizzes) ? quizzes.slice(0, 5) : [];
 
@@ -66,12 +71,12 @@ const QuizExamCard = ({ quizzes = [], loading = false, truncateTitles = false })
             const id = item.id || item._id || index;
             const title = item.title || item.name || "Untitled Quiz";
             const date =
-              item.date || item.quizDate || item.QuizDate || item.createdAt || "";
+              item.quizdate || item.date || item.quizDate || item.QuizDate || item.createdAt || "";
             const daysLeft = getDaysLeft(date);
             const formattedDate = formatDateDisplay(date);
 
             if (daysLeft === -1) {
-              if (id && id !== "0" && id !== 0) {
+              if (!readOnly && id && id !== "0" && id !== 0) {
                 api.delete(`/Quizzes/${id}`).catch(() => {});
               }
               return null;

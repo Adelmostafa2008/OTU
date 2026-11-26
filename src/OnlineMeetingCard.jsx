@@ -29,7 +29,12 @@ const formatMeetingDateTime = (dateString) => {
   return { formattedDate, formattedTime };
 };
 
-const OnlineMeetingCard = ({ meetings = [], loading = false, truncateTitles = false }) => {
+const OnlineMeetingCard = ({
+  meetings = [],
+  loading = false,
+  truncateTitles = false,
+  readOnly = false,
+}) => {
   const navigate = useNavigate();
   const displayItems = Array.isArray(meetings) ? meetings.slice(0, 5) : [];
 
@@ -71,12 +76,12 @@ const OnlineMeetingCard = ({ meetings = [], loading = false, truncateTitles = fa
             const id = item.id || item._id || index;
             const title = item.title || item.name || "Untitled Meeting";
             const date =
-              item.OnlineMeetingDate || item.meetingDate || item.date || item.createdAt || "";
+              item.meetingdate || item.OnlineMeetingDate || item.meetingDate || item.date || item.createdAt || "";
             const daysLeft = getDaysLeft(date);
             const formatted = formatMeetingDateTime(date);
 
             if (daysLeft === -1) {
-              if (id && id !== "0" && id !== 0) {
+              if (!readOnly && id && id !== "0" && id !== 0) {
                 api.delete(`/OnlineMeeting/${id}`).catch(() => {});
               }
               return null;

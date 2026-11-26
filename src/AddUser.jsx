@@ -122,7 +122,7 @@ const validateNewPassword = (password) => {
   if (!/[0-9]/.test(password)) {
     return "Password must contain at least one number.";
   }
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/]/.test(password)) {
     return "Password must contain at least one special character.";
   }
   if (!/[A-Z]/.test(password)) {
@@ -131,13 +131,21 @@ const validateNewPassword = (password) => {
   return null;
 };
 
-const isAdminUser = (user) =>
-  String(user?.role ?? "").toLowerCase() === "admin";
-
 const AddUser = () => {
   const { user, loading: authLoading, isGuest } = useAuth();
   const navigate = useNavigate();
   const { ShowSnackBar } = useSnack();
+  const [cool, setCool] = useState(false);
+
+  const handelSnack = (msg, ty) => {
+    if (!cool) {
+      setCool(true);
+      ShowSnackBar(msg, ty);
+      setTimeout(() => {
+        setCool(false);
+      }, 5000);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState(emptyDrafts);
   const [showPassword, setShowPassword] = useState(false);
@@ -145,9 +153,7 @@ const AddUser = () => {
 
   const userData = drafts[activeRole] ?? emptyUser;
 
-  const canAccessAddUser =
-    String(user?.role ?? "").toLowerCase() === "admin" ||
-    String(user?.role ?? "").toLowerCase() === "guest";
+  const canAccessAddUser = String(user?.role ?? "").toLowerCase() === "admin";
 
   useEffect(() => {
     if (authLoading) return;
@@ -193,21 +199,21 @@ const AddUser = () => {
     const requiredFields = isStaffTab ? STAFF_REQUIRED_FIELDS : STUDENT_REQUIRED_FIELDS;
     const missing = findMissingFields(userData, requiredFields);
     if (missing.length > 0) {
-      ShowSnackBar(`Please fill in: ${missing.join(", ")}.`, "warn");
+      handelSnack(`Please fill in: ${missing.join(", ")}.`, "warn");
       return;
     }
 
     if (!isStaffTab) {
       const trimmedCode = String(userData.code ?? "").trim();
       if (trimmedCode.length !== 5) {
-        ShowSnackBar("University Code must be exactly 5 characters.", "warn");
+        handelSnack("University Code must be exactly 5 characters.", "warn");
         return;
       }
     }
 
     const passwordError = validateNewPassword(userData.password);
     if (passwordError) {
-      ShowSnackBar(passwordError, "warn");
+      handelSnack(passwordError, "warn");
       return;
     }
 
@@ -248,13 +254,13 @@ const AddUser = () => {
           ? response.data
           : response?.data?.message) ||
         "User added successfully.";
-      ShowSnackBar(successMsg, "success");
+      handelSnack(successMsg, "success");
       // Only the tab that was submitted is cleared; the other tabs keep
       // whatever the user already typed in them.
       setDrafts((prev) => ({ ...prev, [activeRole]: { ...emptyUser } }));
       setShowPassword(false);
     } catch (err) {
-      ShowSnackBar(
+      handelSnack(
         getErrorMessage(err, "Failed to add user. Please try again."),
         "error",
       );
@@ -361,8 +367,8 @@ const AddUser = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="text-center sm:text-left">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="text-left">
         <h1 className="m-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
           Add user
         </h1>
@@ -371,7 +377,7 @@ const AddUser = () => {
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto w-full">
+      <div className="w-full">
         <div className="mb-5 flex flex-wrap gap-2 justify-center sm:justify-start">
           {ROLE_TABS.map((tab) => {
             const isActive = activeRole === tab.key;

@@ -1,24 +1,21 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Restore the signed-in user synchronously so the first render already knows
+// who is signed in (no loading flash, no setState inside an effect).
+const readStoredUser = () => {
+  try {
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    return null;
+  }
+};
 
-  useEffect(() => {
-    // runs on refresh to restore user
-    try {
-      const savedUser = localStorage.getItem("user");
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
-    } catch (e) {
-      // ignore parse errors
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(readStoredUser);
+  const loading = false;
 
   const login = (userData) => {
     setUser(userData);
