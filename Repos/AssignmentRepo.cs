@@ -46,20 +46,23 @@ namespace backend.Repos
             return await assignments.ToListAsync();
         }
 
-        public async Task<Assignments> GetAssignment(UploadSort sort, int id)
+        public async Task<Assignments> GetAssignment(UploadSort ?sort, int id)
         {
-            var assignment =  _db.assignments.Include(x => x.Uploader).AsQueryable();
-
-             if (!string.IsNullOrEmpty(sort.Division))
+            var assignment =  _db.assignments.Include(x => x.Uploader).Include(x => x.filesdetails).AsQueryable();
+            if(sort != null)
+            {
+                
+             if (!string.IsNullOrEmpty(sort?.Division))
             {
                 assignment = assignment.Where(x => x.Division == sort.Division);
             }
-            if (!string.IsNullOrEmpty(sort.Faculty))
+            if (!string.IsNullOrEmpty(sort?.Faculty))
             {
                 assignment = assignment.Where(x => x.Faculty == sort.Faculty);
-            }if (sort.Year != null)
+            }if ( sort?.Year != null)
             {
                 assignment = assignment.Where(x => x.Year == sort.Year);
+            }
             }
 
             return await assignment.FirstOrDefaultAsync(x => x.Id == id);

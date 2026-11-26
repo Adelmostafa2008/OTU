@@ -43,6 +43,25 @@ namespace backend.Mappers
             {
                 meet.OnlineMeetingDate = newMeet.OnlineMeetingDate;
             }
+            if(!string.IsNullOrEmpty(newMeet.UploadContentType) && newMeet.UploadContentType != meet.UploadContentType)
+            {
+                meet.UploadContentType = newMeet.UploadContentType;
+            }
+            if(newMeet.UploadContentType == "link")
+            {
+                if(!string.IsNullOrEmpty(newMeet.UploadLink) && meet.Link != newMeet.UploadLink)
+                {
+                    meet.Link = newMeet.UploadLink;
+                    meet.Text = null;
+                }
+            }else if(newMeet.UploadContentType == "text")
+            {
+                if(!string.IsNullOrEmpty(newMeet.UploadText) && newMeet.UploadText != meet.Text)
+                {
+                    meet.Text = newMeet.UploadText;
+                    meet.Link = null;
+                }
+            }
         }
 
         public OnlineMeetings UploadOnlineMeetingMapper(OnlineMeetUploadDTO meeting , User user)
@@ -59,7 +78,10 @@ namespace backend.Mappers
               OnlineMeetingDate = meeting.OnlineMeetingDate,
               Uploader = user,
               UploaderId = user.Id,
-              UploaderName = user.givenName
+              UploaderName = user.givenName,
+              Link = meeting.UploadLink,
+              Text = meeting.UploadText,
+              UploadContentType = meeting.UploadContentType
             };
 
             return newMeeting;

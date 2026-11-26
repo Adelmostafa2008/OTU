@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using backend.Models;
+using backend.Service;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -46,29 +47,25 @@ namespace backend.data
                 .HasForeignKey(l => l.UploaderId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+                builder.Entity<Lessons>()
+                .HasMany(c => c.filesdetails)
+                .WithOne(u => u.lesson)
+                .HasForeignKey(l => l.LessonID)
+                .OnDelete(DeleteBehavior.Cascade);
 
+                builder.Entity<Quizzes>()
+                .HasMany(l => l.filesdetails)
+                .WithOne(u => u.quiz)
+                .HasForeignKey(l => l.QuizID)
+                .OnDelete(DeleteBehavior.Cascade);
 
                 builder.Entity<Assignments>()
-                .Property(x => x.files)
-                .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(
-                        v, (JsonSerializerOptions?)null)!
-                );
-                builder.Entity<Lessons>()
-                .Property(x => x.files)
-                .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(
-                        v, (JsonSerializerOptions?)null)!
-                );
-                builder.Entity<Quizzes>()
-                .Property(x => x.files)
-                .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(
-                        v, (JsonSerializerOptions?)null)!
-                );
+                .HasMany(l => l.filesdetails)
+                .WithOne(u => u.assignment)
+                .HasForeignKey(l => l.AssignmentID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+                
                 
             builder.Entity<IdentityRole>().HasData(
                 new IdentityRole
@@ -108,5 +105,8 @@ namespace backend.data
         public DbSet<Quizzes> quizzes {get;set;}
         public DbSet<OnlineMeetings> onlineMeetings {get;set;}
         public DbSet<Assignments> assignments {get;set;}
+        public DbSet<Lessonfiles> Lessonfiles {get;set;}
+        public DbSet<Assignmentfiles> Assignmentfiles {get;set;}
+        public DbSet<Quizfiles> Quizfiles {get;set;}
     }
 }

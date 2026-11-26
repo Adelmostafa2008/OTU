@@ -72,7 +72,10 @@ namespace backend.Service
                title = meet.Title,
                year = meet.Year  ,
                uploadername = meet.UploaderName,
-               iscreator = user_id != "admin" ? user_id == meet.UploaderId : true
+               iscreator = user_id != "admin" ? user_id == meet.UploaderId : true,
+               link = meet.Link,
+               text = meet.Text,
+               UploadContentType = meet.UploadContentType
             };
         }
 

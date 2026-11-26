@@ -18,25 +18,30 @@ namespace backend.Controllers
     [Authorize]
     public class QuizzesController : ControllerBase
     {
-        private readonly IQuizzesRepo _qr;
-        private readonly UserManager<User> _ur;
+        private readonly IQuizzesRepo _repo;
+        private readonly UserManager<User> _manager;
         private readonly QuizService _service;
 
         public QuizzesController(IQuizzesRepo qr , UserManager<User> ur ,QuizService ser)
         {
             _service = ser;
-            _ur = ur;
-            _qr = qr;
+            _manager = ur;
+            _repo = qr;
         }
 
         [HttpPost]
-        public async Task<IActionResult> UploadQuiz([FromBody] QuizzUploadDTO item)
+        public async Task<IActionResult> UploadQuiz([FromBody] QuizUploadDTO item)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
             var res = await _service.UploadQuiz(item);
 
             if(!res.flag) return BadRequest(res.msg);
+
+            if(res.msg == "Upload docs")
+            {
+                return Ok(res.headers);
+            }
 
             return Created();
         }
@@ -46,30 +51,50 @@ namespace backend.Controllers
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            var item = await _qr.GetById(id);
+            var res = await _service.DeleteQuiz(id);
 
-            if(item != null)
-            {
-                await _qr.Delete(item);
-                return Ok("Deleted Successfully !");
-            }
+            if(!res.flag) return BadRequest(res.msg);
 
-            return NotFound("There Is No Item With Such Id");
+            return Ok(res.msg);
            
         }         
 
         [HttpPut ("{id}")]
-        public async Task<IActionResult> EditQuiz([FromRoute] int id , [FromBody] QuizzEditDTO newquiz)
+        public async Task<IActionResult> EditQuiz([FromRoute] int id , [FromBody] QuizEditDTO newquiz)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            var flag = await _service.EditQuiz(id , newquiz);
+            var res = await _service.EditQuiz(id , newquiz);
 
-            if(flag)
-            {                
-                return Ok("Edited Successfully !");
-            }
-            return NotFound("There Is No Item With Such Id");
+            if(!res.flag) return BadRequest(res.msg);
+
+            return Ok(res.msg);
+           
+        }
+
+        [HttpPut("deletefiles/{quizid}")]
+        public async Task<IActionResult> EditQuiz_DeleteFiles([FromRoute] int quizid , IList<string> keys)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var res = await _service.Edit_DeleteFiles(quizid , keys);
+
+            if(!res.flag) return BadRequest(res.msg);
+
+            return Ok(res.msg);
+        }
+
+        [HttpPut("addfiles/{quizid}")]
+
+        public async Task<IActionResult> EditQuiz_AddFiles([FromRoute] int quizid , QuizEditDTO newquiz)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var res = await _service.Edit_AddFiles(quizid , newquiz);
+
+            if(!res.flag) return BadRequest(res.msg);
+
+            return Ok(res.headers);
         }
         
     }

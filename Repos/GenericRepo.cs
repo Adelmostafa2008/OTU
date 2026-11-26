@@ -29,6 +29,11 @@ namespace backend.Repos
             await Save();
         }
 
+        public async Task DeleteChunk(IList<T> items)
+        {
+            _db.Set<T>().RemoveRange(items);
+        }
+
         public async Task<IList<T>> GetAll()
         {
             var items = await _db.Set<T>().ToListAsync();

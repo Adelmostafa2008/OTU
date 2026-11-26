@@ -3,24 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Amazon.S3.Model;
+using backend.data;
 using backend.DTOs;
 using backend.Mappers;
 using backend.Models;
+using backend.Repos;
 using backend.Repos.interfaces;
 using Microsoft.AspNetCore.Identity;
 
 namespace backend.Service
 {
-    public class Lesson_Service_Result
+    public class File_Upload_Result : result
     {
-        public bool flag {get;set;}
-        public string ?msg {get;set;}
         public List<Url_Type> ? headers {get;set;}
     }
     public class Url_Type
     {
-        public string url {get;set;}
-        public string contenttype {get;set;}
+        public string ?url {get;set;}
+        public string ?contenttype {get;set;}
     }
     public class LessonService
     {
@@ -28,20 +28,22 @@ namespace backend.Service
         private readonly ILessonRepo _repo;
         private readonly IConfiguration _config;
         private readonly IFilebaseClient _s3;
+        private readonly AppDb appDb;
 
-        public LessonService(UserManager<User> manager,IFilebaseClient s3, IConfiguration config , ILessonRepo repo)
+        public LessonService(UserManager<User> manager , AppDb app1,IFilebaseClient s3, IConfiguration config , ILessonRepo repo)
         {
+            appDb = app1;
             _s3 = s3;
             _config = config;
             _repo = repo;
             _manager = manager;
         }
-        public async Task<Lesson_Service_Result> Edit_UploadFiles(UploadAndEditDTO lesson , int id)
+        public async Task<File_Upload_Result> Edit_UploadFiles(UploadAndEditDTO lesson , int id)
         {
             var les = await _repo.GetById(id);
             if(les != null)
             {
-                if(!lesson.docs.Any()) return new Lesson_Service_Result{flag = false , msg = "No documents provided."};
+                if(lesson.docs == null || lesson.docs.Count == 0) return new File_Upload_Result{flag = false , msg = "No documents provided."};
 
                 var client = _s3.CreateClient();
                 FileUploadService _service = new FileUploadService(_config , _s3);
@@ -54,7 +56,7 @@ namespace backend.Service
                 };
                 var URLs = new List<string>();
                 var content_types = new List<string>();
-                var files = new Dictionary<string , string>();
+                var newtoadddocs = new List<Lessonfiles>();
 
                 foreach(var i in lesson.docs)
                 {
@@ -72,9 +74,29 @@ namespace backend.Service
                     var result = await client.GetPreSignedURLAsync(request);
                     content_types.Add(i.content_type);
                     URLs.Add(result);
-                    files.Add(i.filename , customkey);
+                    var file = new Lessonfiles
+                    {
+                        size = i.size,
+                        content_type = i.content_type,
+                        filename = i.filename , 
+                        key = customkey,
+                        LessonID = les.Id
+                    };
+                    newtoadddocs.Add(file);
+                    if(file != null)
+                    {
+                        if(les.filesdetails == null)
+                        {
+                            les.filesdetails = newtoadddocs;
+                        }
+                        else
+                        {
+                            les.filesdetails.Add(file);
+                        } 
+                    } 
                 }
-
+                les.Link = null;
+                les.Text = null;
                 var headers_values = new List<Url_Type>();
 
                 for(int i = 0 ; i < URLs.Count  ; i++)
@@ -87,26 +109,23 @@ namespace backend.Service
 
                     headers_values.Add(HV);
                 }
-                
-                les.files = files;
-
                 await _repo.Save();
 
-                return new Lesson_Service_Result {flag = true , headers = headers_values , msg = "Upload docs"};
+                return new File_Upload_Result {flag = true , headers = headers_values , msg = "Upload docs"};
                 
             }
             else
             {
-                return new Lesson_Service_Result{flag = false , msg = "Invalid Lesson ID."};
+                return new File_Upload_Result{flag = false , msg = "Invalid Lesson ID."};
             }
         }
-        public async Task<Lesson_Service_Result> UploadAndEditLesson(UploadAndEditDTO lesson )
+        public async Task<File_Upload_Result> UploadLesson(UploadAndEditDTO lesson )
         {
-            var user = await _manager.FindByIdAsync(lesson.userid);
+            var user = await _manager.FindByIdAsync(lesson.userid!);
 
-            if(user == null) return new Lesson_Service_Result {flag = false , msg = "Invalid User ID."};
+            if(user == null) return new File_Upload_Result {flag = false , msg = "Invalid User ID."};
 
-            LessonsMapper mapper = new LessonsMapper{};
+            LessonsMapper mapper = new LessonsMapper();
 
             if(lesson.UploadContentType == "link" || lesson.UploadContentType == "text")
             {
@@ -117,7 +136,7 @@ namespace backend.Service
             } 
             else if(lesson.UploadContentType == "documents")
             {
-                if(!lesson.docs.Any()) return new Lesson_Service_Result{flag = false , msg = "No documents provided."};
+                if(lesson.docs == null  || lesson.docs.Count == 0) return new File_Upload_Result{flag = false , msg = "No documents provided."};
 
 
                 var client = _s3.CreateClient();
@@ -131,7 +150,7 @@ namespace backend.Service
                 };
                 var URLs = new List<string>();
                 var content_types = new List<string>();
-                var files = new Dictionary<string , string>();
+                var files = new List<Lessonfiles>();
 
                 foreach(var i in lesson.docs)
                 {
@@ -149,7 +168,14 @@ namespace backend.Service
                     var result = await client.GetPreSignedURLAsync(request);
                     content_types.Add(i.content_type);
                     URLs.Add(result);
-                    files.Add(i.filename , customkey);
+                    var file = new Lessonfiles
+                    {
+                        size = i.size,
+                        content_type = i.content_type,
+                        filename = i.filename , 
+                        key = customkey,
+                    };
+                    files.Add(file);
                 }
                 
                 var newlesson = mapper.UploadLessonMapperWithDocuments(lesson , user , files);
@@ -169,64 +195,52 @@ namespace backend.Service
                     headers_values.Add(HV);
                 }
 
-                return new Lesson_Service_Result {flag = true , headers = headers_values , msg = "Upload docs"};
+                return new File_Upload_Result {flag = true , headers = headers_values , msg = "Upload docs"};
 
             }
             else
             {
-                return new Lesson_Service_Result{flag = false , msg = "Invalid Content Type."};
+                return new File_Upload_Result{flag = false , msg = "Invalid Content Type."};
             }
 
-            return new Lesson_Service_Result{flag = true , msg = "Lesson Uploaded Successfully."};
+            return new File_Upload_Result{flag = true , msg = "Lesson Uploaded Successfully."};
             
         }
 
         public async Task<result> Edit_DeleteFiles(int id , IList<string> keys)
         {
-            var lesson = await _repo.GetById(id);
+            var lesson = await _repo.GetLessonWithFilesById(id);
             if(lesson == null) return new result {flag = false , msg = "Invalid Lesson ID."};
 
             if(!keys.Any() || keys.Count == 0) return new result {flag = false , msg = "No Keys Provided."};
 
-            if(!lesson.files.Any() || lesson.files.Count == 0) return new result {flag = false , msg = "No Files To Delete."};
+            if(lesson.filesdetails == null || lesson.filesdetails.Count == 0) return new result {flag = false , msg = "No Files To Delete."};
 
             var client = _s3.CreateClient();
 
-            var listofkeys = new List<KeyVersion>();
-
-            foreach(var i in keys)
-            {
-                var key = new KeyVersion
+            var listofkeys = keys.Select((x) =>
+                new KeyVersion
                 {
-                    Key = i
-                };
+                    Key = x
+                }
+            ).ToList();
 
-                listofkeys.Add(key);
-            }
-            
+           
             var deleterequest = new DeleteObjectsRequest
             {
                 BucketName = _config["BucketName"],
                 Objects = listofkeys
             };
 
-            var newfiles = new Dictionary<string , string>();
+            var ExecludeSet = new HashSet<string>(keys , StringComparer.OrdinalIgnoreCase);
 
-            var valuelist = lesson.files.Values.ToList();
-            var keylist = lesson.files.Keys.ToList();
-
-            for(int i = 0 ; i < keys.Count ; i++)
-            {
-                var IsExist = keys.Contains(valuelist[i]);
-
-                if(IsExist) continue;
-
-                newfiles.Add(keylist[i] , valuelist[i]);
-            }
+            List<Lessonfiles> FilesToDelete = [.. lesson.filesdetails.Where(x => ExecludeSet.Contains(x.key!))];
 
             await client.DeleteObjectsAsync(deleterequest);
+
+            GenericRepo<Lessonfiles> genericRepo = new GenericRepo<Lessonfiles>(appDb);
             
-            lesson.files = newfiles;
+            await genericRepo.DeleteChunk(FilesToDelete);
 
             await _repo.Save();
             return new result {flag = true , msg = "File/s Deleted Successfully"};
@@ -239,7 +253,7 @@ namespace backend.Service
 
             var client = _s3.CreateClient();
 
-            if(lesson.files == null || lesson.files.Count == 0)
+            if(lesson.filesdetails == null || lesson.filesdetails.Count == 0)
             {
                 await _repo.Delete(lesson);
                 return new result{flag = true , msg = "Lesson Deleted Successfully."};
@@ -247,11 +261,11 @@ namespace backend.Service
 
             var keys = new List<KeyVersion>();
 
-            foreach(var dockey in lesson.files)
+            foreach(var dockey in lesson.filesdetails)
             {
                 var item = new KeyVersion
                 {
-                    Key = dockey.Value
+                    Key = dockey.key
                 };
 
                 keys.Add(item);

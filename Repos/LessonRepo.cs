@@ -55,9 +55,15 @@ namespace backend.Repos
             return await items.ToListAsync();
         }
 
+        public async Task<Lessons> GetLessonWithFilesById(int id)
+        {
+            var lesson = await _db.lessons.Include(x => x.filesdetails).FirstOrDefaultAsync(x => x.Id == id);
+            return lesson;
+        }
+
         public async Task<IList<Lessons>> GetNewestLessonsUploaded(UploadSort sort)
         {
-            var lessons = _db.lessons.AsQueryable();
+            var lessons = _db.lessons.Include(x => x.filesdetails).AsQueryable();
 
             if (!string.IsNullOrEmpty(sort.Division))
             {
@@ -66,12 +72,38 @@ namespace backend.Repos
             if (!string.IsNullOrEmpty(sort.Faculty))
             {
                 lessons = lessons.Where(x => x.Faculty == sort.Faculty);
-            }if (sort.Year != null)
+            }
+            if (sort.Year != null)
             {
                 lessons = lessons.Where(x => x.Year == sort.Year);
             }
 
             return await lessons.OrderByDescending(x => x.UploadDate).Take(6).ToListAsync();
+        }
+
+        public async Task<IList<string>> GetSubjectsBasedOnSort(UploadSort sort , string role)
+        {
+            var subs = _db.lessons.AsQueryable();
+            if(role == "student")
+            {
+                
+            if (!string.IsNullOrEmpty(sort.Division))
+            {
+                subs = subs.Where(x => x.Division == sort.Division);
+            }
+            if (!string.IsNullOrEmpty(sort.Faculty))
+            {
+                subs = subs.Where(x => x.Faculty == sort.Faculty);
+            }
+            if (sort.Year != null)
+            {
+                subs = subs.Where(x => x.Year == sort.Year);
+            }
+            }
+
+            var res = await subs.Select(x => x.Subject).ToListAsync();
+
+            return res;
         }
     }
 }

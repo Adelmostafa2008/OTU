@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
+using backend.Service;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Models
@@ -27,18 +28,19 @@ namespace backend.Models
         public string ?UploaderName {get;set;}
         public string ?Link {get;set;}
         public string ?Text {get;set;}
-        public string ?Type {get;set;}
+        public string ?Type {get;set;} 
+        public string ? UploadContentType {get;set;} 
     }
 
     public class Lessons : GeneralUploads
     {
         public DateTime UploadDate {get;set;} 
-        public Dictionary<string , string> ?files{get;set;}
+        public IList<Lessonfiles> ?filesdetails{get;set;}
     }
 
     public class Quizzes : GeneralUploads
     {
-        public Dictionary<string , string> ?files{get;set;}
+        public IList<Quizfiles> ?filesdetails{get;set;}
         public DateTime QuizDate {get;set;} 
     }
 
@@ -50,7 +52,7 @@ namespace backend.Models
 
     public class Assignments : GeneralUploads
     {
-        public Dictionary<string , string> ?files{get;set;}
+        public IList<Assignmentfiles> ?filesdetails{get;set;}
         public DateTime Deadline {get;set;}
     }
 }

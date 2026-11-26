@@ -184,6 +184,38 @@ namespace backend.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("backend.Models.Assignmentfiles", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssignmentID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("content_type")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("filename")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("key")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("size")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignmentID");
+
+                    b.ToTable("Assignmentfiles");
+                });
+
             modelBuilder.Entity("backend.Models.Assignments", b =>
                 {
                     b.Property<int>("Id")
@@ -225,6 +257,9 @@ namespace backend.Migrations
                     b.Property<string>("Type")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("UploadContentType")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("UploaderId")
                         .HasColumnType("varchar(255)");
 
@@ -234,9 +269,6 @@ namespace backend.Migrations
                     b.Property<int>("Year")
                         .HasColumnType("int");
 
-                    b.Property<string>("files")
-                        .HasColumnType("longtext");
-
                     b.Property<string>("semester")
                         .HasColumnType("longtext");
 
@@ -245,6 +277,38 @@ namespace backend.Migrations
                     b.HasIndex("UploaderId");
 
                     b.ToTable("assignments");
+                });
+
+            modelBuilder.Entity("backend.Models.Lessonfiles", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("LessonID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("content_type")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("filename")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("key")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("size")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LessonID");
+
+                    b.ToTable("Lessonfiles");
                 });
 
             modelBuilder.Entity("backend.Models.Lessons", b =>
@@ -285,6 +349,9 @@ namespace backend.Migrations
                     b.Property<string>("Type")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("UploadContentType")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("UploadDate")
                         .HasColumnType("datetime(6)");
 
@@ -296,9 +363,6 @@ namespace backend.Migrations
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
-
-                    b.Property<string>("files")
-                        .HasColumnType("longtext");
 
                     b.Property<string>("semester")
                         .HasColumnType("longtext");
@@ -351,6 +415,9 @@ namespace backend.Migrations
                     b.Property<string>("Type")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("UploadContentType")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("UploaderId")
                         .HasColumnType("varchar(255)");
 
@@ -368,6 +435,38 @@ namespace backend.Migrations
                     b.HasIndex("UploaderId");
 
                     b.ToTable("onlineMeetings");
+                });
+
+            modelBuilder.Entity("backend.Models.Quizfiles", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("QuizID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("content_type")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("filename")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("key")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("size")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuizID");
+
+                    b.ToTable("Quizfiles");
                 });
 
             modelBuilder.Entity("backend.Models.Quizzes", b =>
@@ -411,6 +510,9 @@ namespace backend.Migrations
                     b.Property<string>("Type")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("UploadContentType")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("UploaderId")
                         .HasColumnType("varchar(255)");
 
@@ -419,9 +521,6 @@ namespace backend.Migrations
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
-
-                    b.Property<string>("files")
-                        .HasColumnType("longtext");
 
                     b.Property<string>("semester")
                         .HasColumnType("longtext");
@@ -573,6 +672,16 @@ namespace backend.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("backend.Models.Assignmentfiles", b =>
+                {
+                    b.HasOne("backend.Models.Assignments", "assignment")
+                        .WithMany("filesdetails")
+                        .HasForeignKey("AssignmentID")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("assignment");
+                });
+
             modelBuilder.Entity("backend.Models.Assignments", b =>
                 {
                     b.HasOne("backend.Models.User", "Uploader")
@@ -581,6 +690,16 @@ namespace backend.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("backend.Models.Lessonfiles", b =>
+                {
+                    b.HasOne("backend.Models.Lessons", "lesson")
+                        .WithMany("filesdetails")
+                        .HasForeignKey("LessonID")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("lesson");
                 });
 
             modelBuilder.Entity("backend.Models.Lessons", b =>
@@ -603,6 +722,16 @@ namespace backend.Migrations
                     b.Navigation("Uploader");
                 });
 
+            modelBuilder.Entity("backend.Models.Quizfiles", b =>
+                {
+                    b.HasOne("backend.Models.Quizzes", "quiz")
+                        .WithMany("filesdetails")
+                        .HasForeignKey("QuizID")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("quiz");
+                });
+
             modelBuilder.Entity("backend.Models.Quizzes", b =>
                 {
                     b.HasOne("backend.Models.User", "Uploader")
@@ -611,6 +740,21 @@ namespace backend.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("backend.Models.Assignments", b =>
+                {
+                    b.Navigation("filesdetails");
+                });
+
+            modelBuilder.Entity("backend.Models.Lessons", b =>
+                {
+                    b.Navigation("filesdetails");
+                });
+
+            modelBuilder.Entity("backend.Models.Quizzes", b =>
+                {
+                    b.Navigation("filesdetails");
                 });
 
             modelBuilder.Entity("backend.Models.User", b =>

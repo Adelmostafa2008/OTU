@@ -32,7 +32,8 @@ namespace backend.Mappers
                     type = lessons[i].Type,
                     msg = "",
                     flag = true ,
-                    preveiwurl = urls[i]
+                    preveiwurl = urls[i],
+                    UploadContentType = lessons[i].UploadContentType
                 };
 
                 res.Add(element);
@@ -47,9 +48,9 @@ namespace backend.Mappers
             {
               Faculty = item.Faculty,
               Division = item.Division,
-              Link = item.UploadLink,
+              Link = item.UploadContentType == "link" ? item.UploadLink : null,
               Notes = item.Notes,
-              Text = item.UploadText,
+              Text = item.UploadContentType == "text" ?  item.UploadText : null,
               semester = item.semester,
               Subject = item.Subject,
               Title = item.Title,
@@ -59,13 +60,14 @@ namespace backend.Mappers
               ,Uploader = user,
               UploaderId = user.Id,
               UploaderName = user.givenName,
-              files = null
+              filesdetails = null,
+              UploadContentType = item.UploadContentType
             };
 
             return newLesson;
         }
 
-         public Lessons UploadLessonMapperWithDocuments(UploadAndEditDTO item , User user , Dictionary<string , string> fileswithkeys)
+         public Lessons UploadLessonMapperWithDocuments(UploadAndEditDTO item , User user , IList<Lessonfiles> fileswithkeys)
         {
              Lessons newLesson = new Lessons
             {
@@ -73,7 +75,7 @@ namespace backend.Mappers
               Division = item.Division,
               Link = null,
               Notes = item.Notes,
-              files = fileswithkeys,
+              filesdetails = fileswithkeys,
               Text = null,
               semester = item.semester,
               Subject = item.Subject,
@@ -83,7 +85,8 @@ namespace backend.Mappers
               UploadDate = DateTime.UtcNow
               ,Uploader = user,
               UploaderId = user.Id,
-              UploaderName = user.givenName
+              UploaderName = user.givenName,
+              UploadContentType = item.UploadContentType
             };
 
             return newLesson;
@@ -91,14 +94,35 @@ namespace backend.Mappers
 
         public void EditLessonMapper(UploadAndEditDTO newLesson , Lessons lesson)
         {
+
+            if(newLesson.UploadContentType == "link")
+            {
+                
             if(!string.IsNullOrEmpty(newLesson.UploadLink) && newLesson.UploadLink != lesson.Link)
             {
                 lesson.Link = newLesson.UploadLink;
             }
+            lesson.Text = null;
+            lesson.filesdetails = null;
+            }
+            if(newLesson.UploadContentType == "text")
+            {
+                
             if(!string.IsNullOrEmpty(newLesson.UploadText) && newLesson.UploadText != lesson.Text)
             {
                 lesson.Text = newLesson.UploadText;
             }
+
+            lesson.Link = null;
+            lesson.filesdetails = null;
+            }
+            else
+            {
+                lesson.Link = null;
+                lesson.Text = null;
+            }
+
+
             if(!string.IsNullOrEmpty(newLesson.Type) && newLesson.Type != lesson.Type)
             {
                 lesson.Type = newLesson.Type;
@@ -130,6 +154,10 @@ namespace backend.Mappers
             if( newLesson?.Notes != lesson.Notes)
             {
                 lesson.Notes = newLesson?.Notes;
+            }
+            if(!string.IsNullOrEmpty(newLesson.UploadContentType) && newLesson.UploadContentType != lesson.UploadContentType)
+            {
+                lesson.UploadContentType = newLesson.UploadContentType;
             }
         }
     }

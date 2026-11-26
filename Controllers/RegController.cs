@@ -65,7 +65,8 @@ namespace backend.Controllers
                     Group = user.Group,
                     Email = user.email,
                     givenName = user.name,
-                    UserName = user.code == "student" ? user.name.Split(" ")[0] + ".OTU-"+ user.code :user.name.Split(" ")[0] + ".OTU-"+ user.nationalId
+                    UserName = user.role == "student" ? (user.name.Split(' ')[0] + ".OTU-"+ user.code) :(user.name.Split(' ')[0] + ".OTU-"+ user.nationalId),
+                    Year = user.Year != null ? int.Parse(user.Year) : null
                    
                 };
 

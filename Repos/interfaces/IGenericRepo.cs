@@ -13,5 +13,6 @@ namespace backend.Repos.interfaces
         Task Update (T item);
         Task Create (T Item);
         Task Save();
+        Task DeleteChunk(IList<T> items);
     }
 }

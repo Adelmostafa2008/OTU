@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using backend.data;
 using backend.DTOs;
 using backend.Models;
 using backend.Repos.interfaces;
@@ -26,8 +27,10 @@ namespace backend.Controllers
         private readonly IConfiguration _config;
         private readonly IFilebaseClient _s3;
         private readonly LessonService _lessonservice;
-        public UploadController(ILessonRepo lr , LessonService lessonService,IFilebaseClient s3  , IConfiguration config, FileUploadService service,UserManager<User> manager)
+        private readonly AppDb appDb;
+        public UploadController(ILessonRepo lr ,AppDb app1, LessonService lessonService,IFilebaseClient s3  , IConfiguration config, FileUploadService service,UserManager<User> manager)
         {
+            appDb = app1;
             _lessonservice = lessonService;
             _s3 = s3;
             _config = config;
@@ -37,13 +40,13 @@ namespace backend.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UploadLesson([FromBody] UploadAndEditDTO item)
+        public async Task<IActionResult> UploadLesson([FromBody] UploadAndEditDTO lesson)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            LessonService _service = new LessonService(_manager,_s3,_config  ,_lr);
+            LessonService _service = new LessonService(_manager,appDb,_s3,_config  ,_lr);
 
-            var res = await _service.UploadAndEditLesson(item);
+            var res = await _service.UploadLesson(lesson);
 
             if(!res.flag) return BadRequest(res.msg);
 
@@ -69,11 +72,11 @@ namespace backend.Controllers
         }        
 
         [HttpPut ("{id}")]
-        public async Task<IActionResult> EditLessonTXTvalues([FromRoute] int id , [FromBody] UploadAndEditDTO newitem)
+        public async Task<IActionResult> EditLessonTXTvalues([FromRoute] int id , [FromBody] UploadAndEditDTO lesson)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            var res = await _lessonservice.EditLesson(newitem , id);
+            var res = await _lessonservice.EditLesson(lesson , id);
 
             if(!res.flag) return BadRequest(res.msg);
 

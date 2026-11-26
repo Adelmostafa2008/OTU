@@ -10,6 +10,7 @@ namespace backend.Repos.interfaces
     public interface IAssignmentRepo : IGenericRepo<Assignments>
     {
         Task<IList<Assignments>> GetAllAssignments(UploadSort sort , bool IsCard , int pagenum);
-        Task<Assignments> GetAssignment(UploadSort sort , int id);
+        Task<Assignments> GetAssignment(UploadSort ?sort , int id);
+        
     }
 }

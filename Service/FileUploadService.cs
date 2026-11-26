@@ -18,12 +18,13 @@ namespace backend.Service
         public string filename{get;set;}
         public int size {get;set;}
         public string content_type {get;set;}
+        public string ? key {get;set;}
     }
     public class Structure
     {
         public string Faculty {get;set;}
         public string Division {get;set;}
-        public string type {get;set;}
+        public string ?type {get;set;}
         public string subject {get;set;}
     }
     public class UploadCloudResult
@@ -70,7 +71,7 @@ namespace backend.Service
 
         public string UniqueObjectKey(string name , Structure sort)
         {
-            var res = $"{sort.Faculty}/{sort.Division}/{sort.subject}/{sort.type}/{DateTime.Now:MM-dd-hh-mm-ss}-{name}";
+            var res = $"{sort.Faculty}/{sort.Division}/{sort.subject}/{(sort.type != null ? sort.type : "Typeless")}/{DateTime.Now:mmddhhmm}-{name}";
             return res;
         }
 

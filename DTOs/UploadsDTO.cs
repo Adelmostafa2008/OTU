@@ -10,21 +10,21 @@ namespace backend.DTOs
 {
     public class GeneralUploadDTO
     {
-        public string Faculty {get;set;}
-        public string Division {get;set;}
-        public string Subject {get;set;}
-        public int Year {get;set;}
-        public string semester {get;set;}
-        [MaxLength(405)]
-        public string ? Notes {get;set;}
-        [MaxLength(105)]
-        public string Title {get;set;}
-        public string ? userid{get;set;} 
-        public string? UploadLink {get;set;}
-        public string ? UploadText {get;set;}
-        public IList<files> ?docs {get;set;}
-        public string ?Type {get;set;}
-        public string ? UploadContentType {get;set;}
+        public string   Faculty               {get;set;}
+        public string   Division              {get;set;}
+        public string   Subject               {get;set;}
+        public int      Year                  {get;set;}
+        public string   semester              {get;set;}
+    [MaxLength(405)]            
+        public string   ?Notes               {get;set;}
+    [MaxLength(105)]
+        public string   Title                 {   get;set;}
+        public string   ?userid             {get;set;} 
+        public string   ?UploadLink         {get;set;}
+        public string   ?UploadText         {get;set;}
+     public IList<files>?docs               {   get;set;}
+         public string   ?Type               {get;set;}
+        public string   ? UploadContentType {get;set;}
     }
     public class UploadAndEditDTO : GeneralUploadDTO
     {
@@ -32,12 +32,12 @@ namespace backend.DTOs
         
     }
 
-    public class QuizzUploadDTO : GeneralUploadDTO
+    public class QuizUploadDTO : GeneralUploadDTO
     {
         public DateTime QuizDate {get;set;} 
     }
 
-    public class QuizzEditDTO : QuizzUploadDTO {}
+    public class QuizEditDTO : QuizUploadDTO {}
 
 
     public class OnlineMeetUploadDTO : GeneralUploadDTO

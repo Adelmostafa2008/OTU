@@ -18,40 +18,45 @@ namespace backend.Repos
 
         public async Task<IList<Quizzes>> GetAllQuizzesWithStudentSort(UploadSort sort)
         {
-            var qzs =  _db.quizzes.AsQueryable();
+            var quizzes =  _db.quizzes.AsQueryable();
 
             if (!string.IsNullOrEmpty(sort.Division))
             {
-                qzs = qzs.Where(x => x.Division == sort.Division);
+                quizzes = quizzes.Where(x => x.Division == sort.Division);
             }
             if (!string.IsNullOrEmpty(sort.Faculty))
             {
-                qzs = qzs.Where(x => x.Faculty == sort.Faculty);
+                quizzes = quizzes.Where(x => x.Faculty == sort.Faculty);
             }if (sort.Year != null)
             {
-                qzs = qzs.Where(x => x.Year == sort.Year);
+                quizzes = quizzes.Where(x => x.Year == sort.Year);
             }
 
-            return await qzs.ToListAsync();
+            return await quizzes.ToListAsync();
         }
 
-        public async Task<Quizzes> GetSingleQuiz(UploadSort sort, int quiz_id)
+        public async Task<Quizzes> GetSingleQuiz(int quiz_id , UploadSort ?sort = null)
         {
-            var qz = _db.quizzes.AsQueryable();
+            var quiz = _db.quizzes.Include(x => x.Uploader).Include(x => x.filesdetails).AsQueryable();
+
+            if(sort != null)
+            {
+                
 
             if (!string.IsNullOrEmpty(sort.Division))
             {
-                qz = qz.Where(x => x.Division == sort.Division);
+                quiz = quiz.Where(x => x.Division == sort.Division);
             }
             if (!string.IsNullOrEmpty(sort.Faculty))
             {
-                qz = qz.Where(x => x.Faculty == sort.Faculty);
+                quiz = quiz.Where(x => x.Faculty == sort.Faculty);
             }if (sort.Year != null)
             {
-                qz = qz.Where(x => x.Year == sort.Year);
+                quiz = quiz.Where(x => x.Year == sort.Year);
             }
 
-            return await qz.FirstOrDefaultAsync(x => x.Id == quiz_id);
+            }
+            return await quiz.FirstOrDefaultAsync(x => x.Id == quiz_id);
         }
     }
 }

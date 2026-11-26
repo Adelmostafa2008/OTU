@@ -16,6 +16,7 @@ namespace backend.DTOs
         public string name      {get;set;}
         public string role {get;set;}
         public string ?nationalId{get;set;}
+        public string ?Year {get;set;}
         
     }
 

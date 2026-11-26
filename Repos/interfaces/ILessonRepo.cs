@@ -11,5 +11,7 @@ namespace backend.Repos.interfaces
     {
         Task<IList<Lessons>> GetAllUploads(UploadSearch search , UploadSort sort , int pageNum);
         Task<IList<Lessons>> GetNewestLessonsUploaded(UploadSort sort);
+        Task<Lessons> GetLessonWithFilesById(int id);
+        Task<IList<string>> GetSubjectsBasedOnSort(UploadSort sort , string role);
     }
 }

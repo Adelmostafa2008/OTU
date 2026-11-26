@@ -85,6 +85,18 @@ namespace backend.Controllers
             return Ok(result);
         }
 
+        [HttpGet ("lessoneditget/{id}")]
+        public async Task<IActionResult> edit_getUploadById([FromRoute] int id , [FromQuery] string userid)
+        {
+            if(!ModelState .IsValid) return BadRequest(ModelState);
+
+            var result = await _student_service.GetLessonByID_Edit(id , userid);
+
+            if(result.title == "err") return BadRequest(result.notes);
+
+            return Ok(result);
+        }
+
         [HttpGet("getlatest/{userid}")]
         public async Task<IActionResult> getNewestUploads([FromRoute] string userid)
         {
@@ -159,7 +171,7 @@ namespace backend.Controllers
         #region Quizzes
 
         [HttpGet("quiz/{id}")]
-        public async Task<IActionResult> getAllQuizzes([FromRoute] string id , [FromBody] bool IsCard = false) // handel the iscard and make it from query and change what need to be changed
+        public async Task<IActionResult> getAllQuizzes([FromRoute] string id , [FromBody] bool IsCard = false) // refine the whole endpoint (get doesnot have bodies)
         {
             var user = await _manager.FindByIdAsync(id);
 
@@ -204,12 +216,23 @@ namespace backend.Controllers
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
+            var res = await _quiz_service.HandelSingleQuizFetch(user_id , quiz_id);
 
-            var data = await _quiz_service.HandelSingleQuizFetch(user_id , quiz_id);
+            if(res.flag == false) return BadRequest(res.msg);
 
-            if(data == null) return NotFound("No meeting with such Id");
+            return Ok(res);
+        }
 
-            return Ok(data);
+        [HttpGet("quiz/single/edit/{quiz_id}")]
+        public async Task<IActionResult> getSingleQuizData_Edit([FromRoute] int quiz_id , [FromQuery] string user_id)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var res = await _quiz_service.GetQuizDetailsForEdit(quiz_id , user_id);
+
+            if(res.flag == false) return BadRequest(res.msg);
+
+            return Ok(res);
         }
         #endregion
 
@@ -271,6 +294,18 @@ namespace backend.Controllers
             return Ok(response.msg);
         }
 
+        [HttpGet("subjects/{userid}")]
+        public async Task<IActionResult> GetSubjects([FromRoute] string userid)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var res = await _student_service.GetSubjects(userid);
+
+            if(!res.flag) return BadRequest(res.msg);
+
+            return Ok(res.subjects);
+        }
+
         #endregion
         
         #region Assignments
@@ -286,6 +321,18 @@ namespace backend.Controllers
             return Ok(assignments);
         }
 
+        [HttpGet("assignment/edit/{userid}")]
+        public async Task<IActionResult> GetAssignmentDetails_Edit([FromRoute] string userid , [FromQuery] int assignmentId)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var assignment = await _assignment_service.GetAssignment_Edit(userid , assignmentId);
+
+            if(assignment.flag == false) return BadRequest(assignment.msg);
+
+            return Ok(assignment); 
+        }
+
         [HttpGet("assignment/{userid}")]
         public async Task<IActionResult> GetAssignmentDetails([FromRoute] string userid , [FromQuery] int assignmentId)
         {
@@ -297,6 +344,8 @@ namespace backend.Controllers
 
             return Ok(assignment); 
         }
+
+        
         #endregion
     }
 }

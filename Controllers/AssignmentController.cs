@@ -31,6 +31,11 @@ namespace backend.Controllers
 
             if(!result.flag) return BadRequest(result.msg);
 
+            if(result.msg == "Upload docs")
+            {
+                return Ok(result.headers);
+            }
+
             return Ok(result.msg);
         }
 
@@ -47,15 +52,39 @@ namespace backend.Controllers
         }
 
         [HttpPut("{assId}")]
-        public async Task<IActionResult> editAssignment([FromRoute] int assId , [FromBody] AssignmentEdit newAssignment)
+        public async Task<IActionResult> EditAssignment_TXT([FromRoute] int assId , [FromBody] AssignmentEdit newAssignment)
         {
             if(!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _service.editAssignment(assId , newAssignment);
+            var result = await _service.EditAssignment_TXTValues(assId , newAssignment);
 
             if(!result.flag) return BadRequest(result.msg);
 
             return Ok(result.msg);
+        }
+
+        [HttpPut("deletefiles/{assid}")]
+        public async Task<IActionResult> EditAssignment_Delete([FromRoute] int assid , IList<string> keys)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var res = await _service.EditAssignment_DeleteFiles(assid , keys);
+
+            if(!res.flag) return BadRequest(res.msg);
+
+            return Ok(res.msg);
+        }
+
+        [HttpPut("addfiles/{assid}")]
+        public async Task<IActionResult> EditAssignment_Add([FromRoute] int assid , AssignmentEdit assignment)
+        {
+            if(!ModelState.IsValid) return BadRequest(ModelState);
+
+            var res = await _service.EditAssignment_AddFiles(assid , assignment);
+
+            if(!res.flag) return BadRequest(res.msg);
+
+            return Ok(res.headers);
         }
     }
 }

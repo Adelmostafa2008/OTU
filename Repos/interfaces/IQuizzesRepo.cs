@@ -10,6 +10,6 @@ namespace backend.Repos.interfaces
     public interface IQuizzesRepo : IGenericRepo<Quizzes>
     {
         Task<IList<Quizzes>> GetAllQuizzesWithStudentSort(UploadSort sort);
-        Task<Quizzes> GetSingleQuiz(UploadSort sort , int quiz_id);
+        Task<Quizzes> GetSingleQuiz(int quiz_id , UploadSort ?sort = null);
     }
 }
